@@ -20,8 +20,12 @@ namespace NSMB.WorldEditor {
         private static readonly Color NeonViolet = new(0.415f, 0f, 1f);
         private static readonly Color NeonCyan = new(0f, 0.784f, 1f);
 
+        // The game's own UI font, so every piece of World text speaks MvL.
+        private static TMP_FontAsset GameFont;
+
         [MenuItem("Tools/World/Build Scenes")]
         public static void BuildScenes() {
+            GameFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Resources/Fonts/BoldFont.asset");
             BuildEntryScene();
             BuildHubScene();
             RegisterScenes();
@@ -74,62 +78,84 @@ namespace NSMB.WorldEditor {
         private static void BuildHubScene() {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+            // NSMB grassland daylight, straight out of the source material.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.16f, 0.19f, 0.26f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogStartDistance = 40f;
-            RenderSettings.fogEndDistance = 140f;
-            RenderSettings.fogColor = Night;
+            RenderSettings.ambientLight = new Color(0.72f, 0.74f, 0.78f);
+            RenderSettings.fog = false;
 
-            var lightGo = new GameObject("Moonlight");
+            var lightGo = new GameObject("Sun");
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Directional;
-            light.intensity = 0.55f;
-            light.color = new Color(0.7f, 0.78f, 1f);
-            lightGo.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
+            light.intensity = 1.05f;
+            light.color = new Color(1f, 0.98f, 0.92f);
+            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
-            // The street: a long strip heading +Z, buildings flanking it.
-            Block("Street", new Vector3(0, -0.5f, 90), new Vector3(26, 1, 220), new Color(0.09f, 0.1f, 0.13f));
-            for (int i = 0; i < 11; i++) {
-                float z = i * 20f;
-                float h1 = 8f + (i * 7f) % 11f, h2 = 9f + (i * 5f) % 13f;
-                Block("BuildingL" + i, new Vector3(-16f, h1 / 2f, z), new Vector3(6f, h1, 12f), new Color(0.07f, 0.08f, 0.11f));
-                Block("BuildingR" + i, new Vector3(16f, h2 / 2f, z), new Vector3(6f, h2, 12f), new Color(0.07f, 0.08f, 0.11f));
-                Color neon = (i % 4) switch { 0 => NeonRed, 1 => NeonBlue, 2 => NeonViolet, _ => NeonCyan };
-                Glow("SignL" + i, new Vector3(-12.8f, 4f + (i % 3), z), new Vector3(0.3f, 2.2f, 4.5f), neon);
-                Glow("SignR" + i, new Vector3(12.8f, 3.5f + ((i + 2) % 3), z + 8f), new Vector3(0.3f, 2.2f, 4.5f), neon);
+            // Ground and cliffs: chunky blocks textured with the game's grassland
+            // atlas — the exact tiles the Versus levels are built from.
+            Material grassMat = SpriteMat(TopRowSprite("Assets/Sprites/Atlases/Terrain/grass.png"));
+            Material blockMat = SpriteMat(FirstSprite("Assets/Sprites/Atlases/Terrain/animated-blocks.png", "animation_0"));
+
+            for (int gx = -3; gx <= 3; gx++) {
+                for (int gz = 0; gz < 56; gz++) {
+                    TexBlock("Ground", new Vector3(gx * 4f, -2f, gz * 4f), new Vector3(4f, 4f, 4f), grassMat);
+                }
+            }
+            for (int gz = 0; gz < 56; gz++) {
+                TexBlock("CliffL", new Vector3(-16f, 0f, gz * 4f), new Vector3(4f, 8f, 4f), grassMat);
+                TexBlock("CliffR", new Vector3(16f, 0f, gz * 4f), new Vector3(4f, 8f, 4f), grassMat);
             }
 
-            // Player: greybox capsule with the controller. Models come later.
+            // Question blocks floating at classic bonk height along the walk.
+            foreach (float z in new[] { 24f, 26f, 28f, 70f, 110f, 112f, 150f, 190f }) {
+                TexBlock("QBlock", new Vector3((z % 8f) - 4f, 3.4f, z), new Vector3(2f, 2f, 2f), blockMat);
+            }
+
+            // The game's own sky as the horizon, and its overworld theme in the air.
+            Backdrop("SkyEnd", new Vector3(0, 24f, 240f), Quaternion.identity, new Vector2(260, 70));
+            Backdrop("SkyL", new Vector3(-55f, 24f, 110f), Quaternion.Euler(0, 90, 0), new Vector2(300, 70));
+            Backdrop("SkyR", new Vector3(55f, 24f, 110f), Quaternion.Euler(0, -90, 0), new Vector2(300, 70));
+
+            var musicGo = new GameObject("Music");
+            var music = musicGo.AddComponent<AudioSource>();
+            music.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/music/overworld.ogg");
+            music.loop = true;
+            music.playOnAwake = true;
+            music.volume = 0.45f;
+            music.spatialBlend = 0f;
+
+            // Player: the game's Mario model at human scale, animated by the
+            // game's own controller — the declared placeholder until David's model.
             var player = new GameObject("Player");
-            player.transform.position = new Vector3(0, 1.2f, 0);
+            player.transform.position = new Vector3(0, 0.3f, 2f);
             var cc = player.AddComponent<CharacterController>();
-            cc.height = 2f;
-            cc.center = Vector3.up;
+            cc.height = 1.8f;
+            cc.radius = 0.35f;
+            cc.center = Vector3.up * 0.9f;
             var pctrl = player.AddComponent<WorldPlayerController>();
-            // Mario is the declared placeholder body until David's model exists.
-            Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed);
+            var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 1.75f);
+            pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
 
             var camGo = new GameObject("Camera");
             var cam = camGo.AddComponent<Camera>();
             cam.tag = "MainCamera";
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Night;
-            camGo.transform.position = new Vector3(0, 4.5f, -7.5f);
+            cam.backgroundColor = new Color(0.45f, 0.72f, 1f);
+            camGo.transform.position = new Vector3(0, 3.4f, -4f);
             var follow = camGo.AddComponent<WorldCamera>();
             follow.target = player.transform;
+            follow.offset = new Vector3(0f, 3.2f, -5.5f);
+            follow.lookHeight = 1.3f;
             pctrl.cam = camGo.transform;
 
             // The companion.
             var npc = new GameObject("Companion");
-            npc.transform.position = new Vector3(2f, 1f, -1f);
+            npc.transform.position = new Vector3(2f, 0.3f, -1f);
             var comp = npc.AddComponent<CompanionNPC>();
             comp.player = player.transform;
             // Luigi as the narrator's placeholder body — the nervous brother who
             // follows you around explaining things. Fitting.
-            Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f));
-            FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 2.6f);
+            Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 1.85f);
+            FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 2.4f);
 
             // Dialogue UI.
             BuildDialogueUi();
@@ -168,13 +194,36 @@ namespace NSMB.WorldEditor {
 
         // ---------------------------------------------------------------- helpers
 
-        private static GameObject Body(Transform parent, string fbxPath, Color fallback) {
+        // Instantiates a model normalised to a target height with its feet at the
+        // parent's origin — import scale on these FBXes is wildly off (the first
+        // build had the camera standing inside Mario's boot).
+        private static GameObject Body(Transform parent, string fbxPath, Color fallback, float targetHeight) {
             var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
             GameObject visual;
             if (model) {
                 visual = (GameObject) PrefabUtility.InstantiatePrefab(model);
                 visual.transform.SetParent(parent, false);
                 visual.transform.localPosition = Vector3.zero;
+                visual.transform.localRotation = Quaternion.identity;
+
+                var renderers = visual.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0) {
+                    Bounds b = renderers[0].bounds;
+                    foreach (var r in renderers) {
+                        b.Encapsulate(r.bounds);
+                    }
+                    if (b.size.y > 0.001f) {
+                        float k = targetHeight / b.size.y;
+                        visual.transform.localScale = Vector3.one * k;
+                        // Recompute after scaling, then drop the feet onto the origin.
+                        b = renderers[0].bounds;
+                        foreach (var r in renderers) {
+                            b.Encapsulate(r.bounds);
+                        }
+                        float lift = parent.position.y - b.min.y + 0.02f;
+                        visual.transform.localPosition = new Vector3(0f, lift, 0f);
+                    }
+                }
             } else {
                 visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 Object.DestroyImmediate(visual.GetComponent<Collider>());
@@ -184,6 +233,20 @@ namespace NSMB.WorldEditor {
             }
             visual.name = "Visual";
             return visual;
+        }
+
+        private static Animator WireAnimator(GameObject visual, string controllerPath) {
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(controllerPath);
+            if (!controller) {
+                return null;
+            }
+            var animator = visual.GetComponentInChildren<Animator>();
+            if (!animator) {
+                animator = visual.AddComponent<Animator>();
+            }
+            animator.runtimeAnimatorController = controller;
+            animator.applyRootMotion = false;
+            return animator;
         }
 
         private static Material Mat(Color c, bool emissive) {
@@ -220,6 +283,9 @@ namespace NSMB.WorldEditor {
             go.transform.SetParent(parent, false);
             go.transform.localPosition = Vector3.up * height;
             var tmp = go.AddComponent<TextMeshPro>();
+            if (GameFont) {
+                tmp.font = GameFont;
+            }
             tmp.text = text;
             tmp.fontSize = 3.2f;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -234,7 +300,7 @@ namespace NSMB.WorldEditor {
             tmp.text = text;
             tmp.fontSize = 2.4f;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = new Color(0.55f, 0.95f, 0.7f, 0.85f);
+            tmp.color = new Color(0.12f, 0.25f, 0.1f, 0.9f);
             tmp.rectTransform.sizeDelta = new Vector2(12, 3);
             go.AddComponent<Billboard>();
         }
@@ -252,30 +318,95 @@ namespace NSMB.WorldEditor {
         private static void Portal(string name, Vector3 pos, Color c, string label, string sceneName, string url) {
             var root = new GameObject(name);
             root.transform.position = pos;
-            Frame(root.transform, c);
+            Pipe(root.transform, c);
             var box = root.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.center = new Vector3(0, 2, 0);
-            box.size = new Vector3(4.5f, 4.5f, 4.5f);
+            box.center = new Vector3(0, 1.5f, 0);
+            box.size = new Vector3(4.5f, 3.5f, 4.5f);
             var portal = root.AddComponent<WorldPortal>();
             portal.sceneName = sceneName;
             portal.url = url;
-            FloatingLabel(root.transform, label, 5.2f);
+            FloatingLabel(root.transform, label, 4.6f);
         }
 
-        private static void Frame(Transform parent, Color c) {
-            void Bar(string n, Vector3 lp, Vector3 ls) {
-                var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                bar.name = n;
-                bar.transform.SetParent(parent, false);
-                bar.transform.localPosition = lp;
-                bar.transform.localScale = ls;
-                bar.GetComponent<Renderer>().sharedMaterial = Mat(c, true);
-                Object.DestroyImmediate(bar.GetComponent<Collider>());
+        // A warp pipe — the only correct shape for a door in this universe. The
+        // accent colour tints the classic pipe green so destinations read apart.
+        private static void Pipe(Transform parent, Color accent) {
+            Color body = Color.Lerp(new Color(0.18f, 0.65f, 0.2f), accent, 0.3f);
+            var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shaft.name = "Shaft";
+            shaft.transform.SetParent(parent, false);
+            shaft.transform.localPosition = new Vector3(0, 1.1f, 0);
+            shaft.transform.localScale = new Vector3(2.2f, 1.1f, 2.2f);
+            shaft.GetComponent<Renderer>().sharedMaterial = Mat(body, false);
+            var lip = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            lip.name = "Lip";
+            lip.transform.SetParent(parent, false);
+            lip.transform.localPosition = new Vector3(0, 2.35f, 0);
+            lip.transform.localScale = new Vector3(2.7f, 0.25f, 2.7f);
+            lip.GetComponent<Renderer>().sharedMaterial = Mat(body * 1.15f, false);
+            var mouth = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            mouth.name = "Mouth";
+            mouth.transform.SetParent(parent, false);
+            mouth.transform.localPosition = new Vector3(0, 2.5f, 0);
+            mouth.transform.localScale = new Vector3(2.2f, 0.06f, 2.2f);
+            mouth.GetComponent<Renderer>().sharedMaterial = Mat(new Color(0.05f, 0.12f, 0.06f), false);
+            Object.DestroyImmediate(shaft.GetComponent<Collider>());
+            Object.DestroyImmediate(lip.GetComponent<Collider>());
+            Object.DestroyImmediate(mouth.GetComponent<Collider>());
+        }
+
+        private static Sprite TopRowSprite(string atlasPath) {
+            var sprites = AssetDatabase.LoadAllAssetsAtPath(atlasPath).OfType<Sprite>().ToArray();
+            if (sprites.Length == 0) {
+                return null;
             }
-            Bar("PostL", new Vector3(-2f, 2f, 0), new Vector3(0.4f, 4f, 0.4f));
-            Bar("PostR", new Vector3(2f, 2f, 0), new Vector3(0.4f, 4f, 0.4f));
-            Bar("Lintel", new Vector3(0, 4.2f, 0), new Vector3(4.4f, 0.4f, 0.4f));
+            float topY = sprites.Max(s => s.rect.y);
+            return sprites.Where(s => Mathf.Approximately(s.rect.y, topY)).OrderBy(s => s.rect.x).First();
+        }
+
+        private static Sprite FirstSprite(string atlasPath, string name) {
+            return AssetDatabase.LoadAllAssetsAtPath(atlasPath).OfType<Sprite>()
+                .FirstOrDefault(s => s.name == name);
+        }
+
+        private static Material SpriteMat(Sprite sprite) {
+            if (!sprite) {
+                return Mat(new Color(0.55f, 0.35f, 0.16f), false);
+            }
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetTexture("_BaseMap", sprite.texture);
+            Rect r = sprite.textureRect;
+            mat.SetTextureScale("_BaseMap", new Vector2(r.width / sprite.texture.width, r.height / sprite.texture.height));
+            mat.SetTextureOffset("_BaseMap", new Vector2(r.x / sprite.texture.width, r.y / sprite.texture.height));
+            mat.SetFloat("_Smoothness", 0f);
+            return mat;
+        }
+
+        private static void TexBlock(string name, Vector3 pos, Vector3 size, Material mat) {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.position = pos;
+            go.transform.localScale = size;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            go.isStatic = true;
+        }
+
+        private static void Backdrop(string name, Vector3 pos, Quaternion rot, Vector2 size) {
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Sprites/Level Backgrounds/grass-sky.png");
+            if (!tex) {
+                return;
+            }
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            go.transform.position = pos;
+            go.transform.rotation = rot;
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            mat.SetTexture("_BaseMap", tex);
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            go.isStatic = true;
         }
 
         private static void BuildDialogueUi() {
@@ -312,6 +443,9 @@ namespace NSMB.WorldEditor {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var tmp = go.AddComponent<TextMeshProUGUI>();
+            if (GameFont) {
+                tmp.font = GameFont;
+            }
             tmp.text = text;
             tmp.fontSize = size;
             tmp.alignment = TextAlignmentOptions.Center;

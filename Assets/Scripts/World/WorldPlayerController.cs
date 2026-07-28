@@ -14,6 +14,9 @@ namespace NSMB.World {
         public float gravity = -26f;
         public float turnSpeed = 14f;
         public Transform cam;
+        // The game's own animator (LargeMario.controller) — we feed the same
+        // parameters its 2D sim feeds, and its state machine does the acting.
+        public Animator animator;
 
         private CharacterController controller;
         private float verticalVelocity;
@@ -59,6 +62,15 @@ namespace NSMB.World {
             if (move.sqrMagnitude > 0.001f) {
                 Quaternion target = Quaternion.LookRotation(move, Vector3.up);
                 transform.rotation = Quaternion.Slerp(transform.rotation, target, turnSpeed * Time.deltaTime);
+            }
+
+            if (animator) {
+                Vector3 flat = controller.velocity;
+                flat.y = 0f;
+                animator.SetFloat("velocityMagnitude", flat.magnitude);
+                animator.SetFloat("velocityY", controller.velocity.y);
+                animator.SetBool("onGround", controller.isGrounded);
+                animator.SetBool("crouching", controller.isGrounded && (kb.sKey.isPressed || kb.downArrowKey.isPressed));
             }
         }
     }
