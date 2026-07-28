@@ -134,6 +134,7 @@ namespace NSMB.WorldEditor {
             var pctrl = player.AddComponent<WorldPlayerController>();
             var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 1.75f);
             pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
+            Dress(marioVisual, "Assets/Materials/3d/mario/mat_mario_big.mat", "Assets/Materials/3d/mario/mat_mario_eyes.mat");
 
             var camGo = new GameObject("Camera");
             var cam = camGo.AddComponent<Camera>();
@@ -154,7 +155,8 @@ namespace NSMB.WorldEditor {
             comp.player = player.transform;
             // Luigi as the narrator's placeholder body — the nervous brother who
             // follows you around explaining things. Fitting.
-            Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 1.85f);
+            var luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 1.85f);
+            Dress(luigiVisual, "Assets/Materials/3d/luigi/mat_luigi_big.mat", "Assets/Materials/3d/luigi/mat_luigi_eyes.mat");
             FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 2.4f);
 
             // Dialogue UI.
@@ -223,6 +225,11 @@ namespace NSMB.WorldEditor {
                         float lift = parent.position.y - b.min.y + 0.02f;
                         visual.transform.localPosition = new Vector3(0f, lift, 0f);
                     }
+                    // The FBX ships unmaterialed (the game assigns these in its
+                    // prefabs) and must never bring colliders of its own.
+                    foreach (var col in visual.GetComponentsInChildren<Collider>()) {
+                        Object.DestroyImmediate(col);
+                    }
                 }
             } else {
                 visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -233,6 +240,24 @@ namespace NSMB.WorldEditor {
             }
             visual.name = "Visual";
             return visual;
+        }
+
+        // The game's material set for a body: eyes renderers get the eye material,
+        // everything else wears the body material.
+        private static void Dress(GameObject visual, string bodyMatPath, string eyesMatPath) {
+            var body = AssetDatabase.LoadAssetAtPath<Material>(bodyMatPath);
+            var eyes = AssetDatabase.LoadAssetAtPath<Material>(eyesMatPath);
+            if (!body) {
+                return;
+            }
+            foreach (var r in visual.GetComponentsInChildren<Renderer>()) {
+                bool isEyes = eyes && r.name.ToLowerInvariant().Contains("eye");
+                var mats = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < mats.Length; i++) {
+                    mats[i] = isEyes ? eyes : body;
+                }
+                r.sharedMaterials = mats;
+            }
         }
 
         private static Animator WireAnimator(GameObject visual, string controllerPath) {

@@ -72,6 +72,16 @@ namespace NSMB.World {
                 animator.SetBool("onGround", controller.isGrounded);
                 animator.SetBool("crouching", controller.isGrounded && (kb.sKey.isPressed || kb.downArrowKey.isPressed));
             }
+
+            // Field telemetry: movement has failed twice on production with no
+            // reproducible cause in the editor. Two-second heartbeat to the
+            // browser console until the World is proven healthy.
+            if (Time.time - lastBeat > 2f) {
+                lastBeat = Time.time;
+                Debug.Log($"[World] pos={transform.position:F1} input=({x:F0},{z:F0}) grounded={controller.isGrounded} vel={controller.velocity.magnitude:F1}");
+            }
         }
+
+        private float lastBeat;
     }
 }
