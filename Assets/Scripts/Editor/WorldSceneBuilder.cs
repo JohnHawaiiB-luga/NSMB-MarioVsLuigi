@@ -134,15 +134,22 @@ namespace NSMB.WorldEditor {
             // Dialogue UI.
             BuildDialogueUi();
 
-            // The story beats along the street.
-            Trigger(new Vector3(0, 1, 6), "Oh! A visitor. Welcome to the World. I'm Erik — well, a dev-build of him. The guy you're playing? That's David. Same person. Long story, good lore.",
-                    "This whole place belongs to David Erik García Arenas — engineer, Munich, dangerous amounts of free-time energy. Walk on, I'll explain him as we go.");
-            Trigger(new Vector3(0, 1, 40), "See those checkmarks? At a BMW supplier he built a QA tool that runs 1,300 automated checks on 3D vehicle data before every delivery. It caught real defects. The team adopted it. He was 21.",
-                    "That's the day job. The night job is where it gets weird — keep walking.");
-            Trigger(new Vector3(0, 1, 80), "He reverse-engineers console games. Took a PS4 binary, translated its shaders to SPIR-V, wrote a Vulkan renderer, and fixed the hair that emulators break. There's a whole writeup. RenderDoc captures and everything.",
-                    "The red door around here leads to HawaiiOS — his operating system. Yes, he built an operating system for a phone that doesn't exist. Press E at any door to go through.");
-            Trigger(new Vector3(0, 1, 120), "He also sculpts. Blender, mostly EEVEE — Yakuza and Final Fantasy stuff. One day these capsules you and I are wearing become real characters he made. David vs Erik. Mark my words.",
-                    "The arcade at the end of the street runs the classic Versus game this World grew out of — grab a friend, it's real multiplayer on his own server.");
+            // The story beats along the street — a conversation between the two of
+            // them, placeholder bodies acknowledged in-fiction.
+            Trigger(new Vector3(0, 1, 6),
+                "ERIK (luigi.tmp)|Oh! A visitor! Welcome to the World. I'm Erik — or I will be, once the boss sculpts me a body. For now I'm, um. Borrowing Luigi.",
+                "DAVID (mario.tmp)|And I'm David — same person as Erik, long story, good lore. Currently shaped like a certain plumber. Nintendo, if you're reading this: placeholders! Temporary! Don't sue, pweaseeee.",
+                "ERIK (luigi.tmp)|He's serious, there's a roadmap and everything. Anyway — this street is his portfolio. Walk on, we'll explain him as we go.");
+            Trigger(new Vector3(0, 1, 40),
+                "ERIK (luigi.tmp)|Day job: at a BMW supplier he designed the team's pre-delivery QA tool. 1,300 automated checks on 3D vehicle data, every single release.",
+                "DAVID (mario.tmp)|It caught real defects before they shipped. I was 21 when I built it. Still am, actually.");
+            Trigger(new Vector3(0, 1, 80),
+                "ERIK (luigi.tmp)|Night job: he reverse-engineers console games. PS4 binary, shaders translated to SPIR-V, his own Vulkan renderer. He fixed hair that emulators get wrong.",
+                "DAVID (mario.tmp)|Frame 1377. The hair rendered. I told everyone. Repeatedly.",
+                "ERIK (luigi.tmp)|The blue door here leads to HawaiiOS — the operating system he built for this website. Press E at any door to step through.");
+            Trigger(new Vector3(0, 1, 120),
+                "ERIK (luigi.tmp)|He sculpts too — Blender, EEVEE, Yakuza and Final Fantasy things. Which is how we eventually get faces that aren't... these.",
+                "DAVID (mario.tmp)|The arcade at the end runs the classic Versus game this World grew out of — by ipodtouch0218 and contributors, used with permission. Bring a friend, it's real multiplayer on my own server.");
 
             // Doors.
             Portal("Door-HawaiiOS", new Vector3(-11f, 0, 85f), NeonBlue, "HawaiiOS\n<size=55%>his operating system — press E</size>", null, "https://erikgaren.com/os");

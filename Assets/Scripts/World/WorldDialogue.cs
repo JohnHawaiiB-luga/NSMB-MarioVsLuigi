@@ -25,12 +25,19 @@ namespace NSMB.World {
             }
         }
 
-        public static void Say(string speaker, string[] lines) {
+        // Lines may carry their own speaker as "NAME|text" — conversations, not
+        // monologue. Lines without a prefix fall back to the trigger's speaker.
+        public static void Say(string defaultSpeaker, string[] lines) {
             if (!Instance) {
                 return;
             }
-            foreach (string line in lines) {
-                Instance.queue.Enqueue((speaker, line));
+            foreach (string raw in lines) {
+                int split = raw.IndexOf('|');
+                if (split > 0 && split < 40) {
+                    Instance.queue.Enqueue((raw[..split], raw[(split + 1)..]));
+                } else {
+                    Instance.queue.Enqueue((defaultSpeaker, raw));
+                }
             }
             if (!Instance.panel.activeSelf) {
                 Instance.Next();
@@ -45,6 +52,9 @@ namespace NSMB.World {
             (string speaker, string line) = queue.Dequeue();
             panel.SetActive(true);
             speakerText.text = speaker;
+            speakerText.color = speaker.Contains("DAVID") ? new Color(1f, 0.42f, 0.32f)
+                : speaker.Contains("ERIK") ? new Color(0.45f, 0.9f, 0.5f)
+                : Color.white;
             lineText.text = line;
             shownAt = Time.time;
         }
