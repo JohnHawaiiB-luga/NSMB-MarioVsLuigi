@@ -126,7 +126,7 @@ namespace NSMB.Networking {
             StateChanged?.Invoke(ClientState.Disconnected, ClientState.Authenticating);
             region ??= Instance.lastRegion;
             Instance.lastRegion = region;
-            Client.AuthValues = await AuthenticationHandler.Authenticate();
+            Client.AuthValues = AuthenticationHandler.AuthenticateOffline();
 
             if (Client == null) {
                 return false;
@@ -154,7 +154,9 @@ namespace NSMB.Networking {
                 }
 
                 await Client.ConnectUsingSettingsAsync(new AppSettings {
-                    AppIdQuantum = "6b4b72d0-57c3-4991-96c1-f3f36f9548e5",
+                    // The App ID belongs in PhotonServerSettings, not in source — each
+                    // deployment supplies its own asset and runs on its own quota.
+                    AppIdQuantum = PhotonServerSettings.Global.AppSettings.AppIdQuantum,
                     AppVersion = GameVersion.Current.ToStringIgnoreHotfix() + buildIdentifier,
                     EnableLobbyStatistics = true,
                     AuthMode = AuthModeOption.Auth,

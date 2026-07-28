@@ -14,6 +14,11 @@ namespace NSMB.UI.MainMenu.Submenus.Prompts {
 
         public override void Initialize() {
             base.Initialize();
+            // The web deployment is the distribution itself — visitors always run the
+            // latest build, so there is nothing to phone home about.
+            if (Application.platform == RuntimePlatform.WebGLPlayer) {
+                return;
+            }
             UpdateChecker.IsUpToDate((isUpToDate, newVersion) => {
                 remoteVersion = newVersion;
                 upToDate = isUpToDate;

@@ -92,6 +92,19 @@ namespace NSMB.Networking {
             return values;
         }
 
+        // This deployment runs on its own Photon application with anonymous auth —
+        // no upstream account server, no ban list, just a stable local identity so
+        // Photon can tell returning players apart.
+        public static AuthenticationValues AuthenticateOffline() {
+            string userid = PlayerPrefs.GetString("world.userid", null);
+            if (string.IsNullOrEmpty(userid)) {
+                userid = Guid.NewGuid().ToString();
+                PlayerPrefs.SetString("world.userid", userid);
+                PlayerPrefs.Save();
+            }
+            return new AuthenticationValues { UserId = userid };
+        }
+
         public static bool TryUpdateNicknameColor() {
             string token = PlayerPrefs.GetString("token");
             if (string.IsNullOrEmpty(token)) {
