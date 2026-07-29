@@ -21,9 +21,13 @@ namespace NSMB.World {
 
         private const string ButtonName = "BtnWorldHub";
 
-        // The empty height between Addons (.55) and About (.25) in their own
-        // column — room for one more button without moving any of theirs.
-        private const float ButtonSlot = 0.45f;
+        // Their column runs Play .85, Options .75, Replays .65, Addons .55,
+        // then a gap, then About .25 and Quit .15. World Hub takes the top and
+        // the four above the gap step down one slot into it, which leaves the
+        // menu evenly spaced and About and Quit where they were.
+        private const float TopSlot = 0.85f;
+        private const float SlotStep = 0.10f;
+        private const float ShiftAbove = 0.55f;
 
         private Button worldButton;
         private GameObject blurb;
@@ -93,15 +97,22 @@ namespace NSMB.World {
             clone.name = ButtonName;
 
             // Their menu has no layout group: each button is point-anchored at
-            // its own height (Play .85, Options .75, Replays .65, Addons .55,
-            // then a gap, then About .25 and Quit .15). A clone keeps Play's
-            // anchor, so it sat exactly on top of Play and looked missing.
-            // The gap is where a seventh button belongs.
+            // its own height, so a clone keeps Play's anchor and sits exactly
+            // on top of it — which is why the button looked missing rather than
+            // misplaced. Make room at the top instead of hiding in the gap.
+            foreach (Transform child in play.transform.parent) {
+                if (child == clone.transform || !child.GetComponent<PipeButton>()) {
+                    continue;
+                }
+                var theirs = child.GetComponent<RectTransform>();
+                if (theirs && theirs.anchorMin.y >= ShiftAbove - 0.001f) {
+                    Slot(theirs, theirs.anchorMin.y - SlotStep);
+                }
+            }
+
             var rect = clone.GetComponent<RectTransform>();
             if (rect) {
-                rect.anchorMin = new Vector2(rect.anchorMin.x, ButtonSlot);
-                rect.anchorMax = new Vector2(rect.anchorMax.x, ButtonSlot);
-                rect.anchoredPosition = Vector2.zero;
+                Slot(rect, TopSlot);
             }
 
             // The translation driver would overwrite our label on the next
@@ -157,6 +168,12 @@ namespace NSMB.World {
                 nav.selectOnDown = buttons[(i + 1) % buttons.Count];
                 buttons[i].navigation = nav;
             }
+        }
+
+        private static void Slot(RectTransform rect, float height) {
+            rect.anchorMin = new Vector2(rect.anchorMin.x, height);
+            rect.anchorMax = new Vector2(rect.anchorMax.x, height);
+            rect.anchoredPosition = Vector2.zero;
         }
 
         private void FindBoard() {

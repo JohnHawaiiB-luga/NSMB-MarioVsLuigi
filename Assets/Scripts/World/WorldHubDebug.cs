@@ -57,8 +57,10 @@ namespace NSMB.World {
         }
 
         private void OnGUI() {
+            // Nothing at all until it is asked for. An always-on hint sat over
+            // the game's own HUD, and an OnGUI rect eats touches wherever it
+            // is drawn — a debug panel has no business taking the controls.
             if (!shown) {
-                GUI.Label(new Rect(8, 8, 400, 20), "TAB debug   C camera");
                 return;
             }
 
@@ -71,10 +73,13 @@ namespace NSMB.World {
                 }
             }
 
-            GUI.Box(new Rect(8, 8, 330, 190), "JOHN HAWAII B. LUGA'S WORLD — DEBUG");
+            // Right-hand side, clear of their coin and star counters and of the
+            // page's thumb controls along the bottom.
+            float x = Screen.width - 338;
+            GUI.Box(new Rect(x, 8, 330, 190), "JOHN HAWAII B. LUGA'S WORLD — DEBUG");
             int row = 0;
             void Line(string label, string value) {
-                GUI.Label(new Rect(18, 32 + row * 18, 310, 18), $"{row + 1:00}  {label,-14} {value}");
+                GUI.Label(new Rect(x + 10, 32 + row * 18, 310, 18), $"{row + 1:00}  {label,-14} {value}");
                 row++;
             }
 
@@ -86,10 +91,10 @@ namespace NSMB.World {
             Line("dialogue", WorldDialogue.IsOpen ? "open" : "idle");
             Line("session", WorldLocalGame.Running ? "world hub" : "versus");
 
-            if (GUI.Button(new Rect(18, 32 + row * 18 + 6, 150, 22), "camera (C)")) {
+            if (GUI.Button(new Rect(x + 10, 32 + row * 18 + 6, 150, 22), "camera (C)")) {
                 ToggleCamera();
             }
-            if (GUI.Button(new Rect(176, 32 + row * 18 + 6, 150, 22),
+            if (GUI.Button(new Rect(x + 168, 32 + row * 18 + 6, 150, 22),
                 Time.timeScale > 0.9f ? "slow motion" : "normal speed")) {
                 Time.timeScale = Time.timeScale > 0.9f ? 0.35f : 1f;
             }

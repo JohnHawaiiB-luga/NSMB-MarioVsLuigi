@@ -1,4 +1,5 @@
 using NSMB.Networking;
+using NSMB.UI.MainMenu;
 using Photon.Deterministic;
 using Quantum;
 using System;
@@ -85,6 +86,35 @@ namespace NSMB.World {
             game.SendCommand(new CommandToggleReady());
             yield return new WaitForSecondsRealtime(0.3f);
             game.SendCommand(new CommandToggleCountdown());
+
+            yield return HideLobby(game);
+        }
+
+        // Their MenuGameStateHandler switches the menu off the moment the state
+        // leaves the pre-game room. It never fired for this session, so the
+        // whole lobby — room panel, character list, chat box — stayed drawn on
+        // top of the hub, and its input fields swallowed the controls. Watch
+        // the state directly and turn off the same object they would.
+        private static IEnumerator HideLobby(QuantumGame game) {
+            float deadline = Time.unscaledTime + 25f;
+            while (Time.unscaledTime < deadline) {
+                if (HasStarted(game.Frames.Predicted)) {
+                    var handler = FindFirstObjectByType<MenuGameStateHandler>(FindObjectsInactive.Include);
+                    if (handler) {
+                        handler.gameObject.SetActive(false);
+                        Debug.Log("[World] lobby hidden for the hub");
+                    }
+                    yield break;
+                }
+                yield return null;
+            }
+            Debug.LogWarning("[World] game state never left the pre-game room — lobby left up");
+        }
+
+        // The frame's globals are behind a pointer, and an iterator may not
+        // hold unsafe code — so the reach into the frame lives here.
+        private static unsafe bool HasStarted(Frame frame) {
+            return frame != null && frame.Global->GameState != GameState.PreGameRoom;
         }
 
         private static async Task<bool> StartSession() {
