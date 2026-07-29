@@ -1,15 +1,18 @@
 using NSMB.Tiles;
+using NSMB.World;
 using Photon.Deterministic;
 using Quantum;
 using Quantum.Editor;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 
 namespace NSMB.WorldEditor {
     // Builds the hub as a real Versus stage by taking one of their finished
@@ -60,6 +63,9 @@ namespace NSMB.WorldEditor {
         // second copy of every stage on top of the first.
         private const string BlendMarker = "WorldBlend";
 
+        // Same idea for the story layer: one Luigi is plenty.
+        private const string StoryMarker = "WorldStory";
+
         // Ours, and not to be taken from the level we copied.
         private static readonly string[] OwnFields = {
             "m_Script", "m_Name", "Identifier", "TranslationKey",
@@ -94,6 +100,7 @@ namespace NSMB.WorldEditor {
 
             Scene scene = EditorSceneManager.OpenScene(ScenePath);
             Blend(scene);
+            BuildStory(scene);
 
             var reference = AssetDatabase.LoadAssetAtPath<VersusStageData>(SourceStage);
             if (!reference) {
@@ -279,6 +286,210 @@ namespace NSMB.WorldEditor {
                 var clone = UnityEngine.Object.Instantiate(
                     go, go.transform.position + offset, go.transform.rotation, container.transform);
                 clone.name = go.name;
+            }
+        }
+
+        // The part that makes this a portfolio rather than a playground: Luigi
+        // walking a step behind you, and things to walk up to that have
+        // something to say. Authored here rather than built at runtime because
+        // their dialogue panel and Luigi's model are project assets, and only
+        // the editor can reach those by path.
+        private static void BuildStory(Scene scene) {
+            if (GameObject.Find(StoryMarker)) {
+                return;
+            }
+            var root = new GameObject(StoryMarker);
+            SceneManager.MoveGameObjectToScene(root, scene);
+
+            var stage = AssetDatabase.LoadAssetAtPath<VersusStageData>(SourceStage);
+            Vector3 spawn = stage
+                ? new Vector3(stage.Spawnpoint.X.AsFloat, stage.Spawnpoint.Y.AsFloat, 0f)
+                : Vector3.zero;
+
+            BuildLuigi(root.transform, spawn);
+            BuildBubble(root.transform);
+            BuildSigns(root.transform, spawn);
+            Debug.Log("[WorldStageBuilder] story layer built: Luigi, dialogue and signs");
+        }
+
+        private static void BuildLuigi(Transform parent, Vector3 spawn) {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerLuigi.prefab");
+            if (!prefab) {
+                Debug.LogError("[WorldStageBuilder] PlayerLuigi.prefab is missing — no companion");
+                return;
+            }
+
+            var luigi = (GameObject) PrefabUtility.InstantiatePrefab(prefab, parent);
+            PrefabUtility.UnpackPrefabInstance(luigi, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            luigi.name = "Luigi";
+            luigi.transform.position = spawn + new Vector3(-2f, 0f, 0f);
+
+            // He is scenery, not a player: everything that would have the
+            // simulation try to drive him has to come off, or he will look for
+            // an entity that was never created for him.
+            foreach (var mb in luigi.GetComponentsInChildren<MonoBehaviour>(true)) {
+                if (!mb) {
+                    continue;
+                }
+                string type = mb.GetType().Name;
+                if (type.StartsWith("Quantum") || type.StartsWith("QPrototype") || type == "MarioPlayerAnimator") {
+                    UnityEngine.Object.DestroyImmediate(mb, true);
+                }
+            }
+
+            // Their gameplay prefabs ship without a controller because the
+            // simulation assigns one; standing on his own he needs it spelled
+            // out, and needs to animate whether or not he is on screen.
+            var animator = luigi.GetComponentInChildren<Animator>(true);
+            if (animator) {
+                var controller = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                    "Assets/Animations/Player/Luigi/LargeLuigi.overrideController") as RuntimeAnimatorController;
+                if (controller) {
+                    animator.runtimeAnimatorController = controller;
+                }
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            }
+
+            var companion = luigi.AddComponent<WorldCompanion>();
+            companion.animator = animator;
+
+            var speaker = luigi.AddComponent<WorldSpeaker>();
+            speaker.keyword = "LUIGI";
+            speaker.bubbleHeight = 1.6f;
+        }
+
+        private static void BuildBubble(Transform parent) {
+            var canvasGo = new GameObject("DialogueBubble", typeof(Canvas));
+            canvasGo.transform.SetParent(parent, false);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var canvasRect = canvas.GetComponent<RectTransform>();
+            canvasRect.sizeDelta = new Vector2(6f, 2.2f);
+            canvasRect.localScale = Vector3.one * 0.5f;
+
+            var panel = new GameObject("Panel", typeof(Image));
+            panel.transform.SetParent(canvasGo.transform, false);
+            var panelImage = panel.GetComponent<Image>();
+            panelImage.sprite = Sprite("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px-dialogue.png");
+            panelImage.type = Image.Type.Sliced;
+            panelImage.color = new Color(0.06f, 0.07f, 0.12f, 0.94f);
+            var panelRect = panel.GetComponent<RectTransform>();
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+
+            TMP_Text name = Text(panel.transform, "Name", 0.42f, TextAlignmentOptions.TopLeft,
+                new Vector2(0.04f, 0.62f), new Vector2(0.96f, 0.96f));
+            TMP_Text line = Text(panel.transform, "Line", 0.34f, TextAlignmentOptions.TopLeft,
+                new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.62f));
+
+            var promptGo = new GameObject("Prompt", typeof(Image));
+            promptGo.transform.SetParent(panel.transform, false);
+            var prompt = promptGo.GetComponent<Image>();
+            prompt.sprite = Sprite("Assets/Sprites/UI/Menu/Elements/a-prompt.png");
+            prompt.preserveAspect = true;
+            var promptRect = promptGo.GetComponent<RectTransform>();
+            promptRect.anchorMin = new Vector2(0.88f, 0.05f);
+            promptRect.anchorMax = new Vector2(0.98f, 0.3f);
+            promptRect.offsetMin = Vector2.zero;
+            promptRect.offsetMax = Vector2.zero;
+
+            var voice = canvasGo.AddComponent<AudioSource>();
+            voice.playOnAwake = false;
+            voice.spatialBlend = 0f;
+
+            var dialogue = canvasGo.AddComponent<WorldDialogue>();
+            dialogue.bubble = panel;
+            dialogue.nameText = name;
+            dialogue.lineText = line;
+            dialogue.prompt = prompt;
+            dialogue.voice = voice;
+            dialogue.typeClip = Clip("Assets/Sound/ui/chat_keydown.wav", "chat_keydown");
+            dialogue.openClip = Clip("Assets/Sound/ui/chat_fulltype.wav", "chat_fulltype");
+            dialogue.doneClip = dialogue.openClip;
+        }
+
+        private static TMP_Text Text(Transform parent, string name, float size,
+            TextAlignmentOptions align, Vector2 min, Vector2 max) {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = size;
+            tmp.alignment = align;
+            tmp.color = Color.white;
+            var rect = tmp.rectTransform;
+            rect.anchorMin = min;
+            rect.anchorMax = max;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            return tmp;
+        }
+
+        private static Sprite Sprite(string path) {
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (!sprite) {
+                Debug.LogWarning($"[WorldStageBuilder] sprite {path} not found");
+            }
+            return sprite;
+        }
+
+        // Their sound files move around between versions; fall back to a search
+        // rather than leaving the bubble mute.
+        private static AudioClip Clip(string path, string name) {
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+            if (clip) {
+                return clip;
+            }
+            foreach (string guid in AssetDatabase.FindAssets($"{name} t:AudioClip")) {
+                var found = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
+                if (found) {
+                    return found;
+                }
+            }
+            Debug.LogWarning($"[WorldStageBuilder] audio clip {name} not found");
+            return null;
+        }
+
+        private static void BuildSigns(Transform parent, Vector3 spawn) {
+            (string speaker, float x, string[] lines)[] script = {
+                ("LUIGI", 8f, new[] {
+                    "LUIGI|Oh — you found the door. Welcome to John Hawaii B. Luga's World.",
+                    "LUIGI|I'm the tour. Mario's the legs. Walk right and I'll do the talking.",
+                }),
+                ("LUIGI", 52f, new[] {
+                    "LUIGI|The man behind all this is David Erik García Arenas. Munich.",
+                    "LUIGI|He builds 3D QA tooling — the kind that catches what eyes miss.",
+                    "DAVID|Cars, render pipelines, and a lot of things that must not ship broken.",
+                }),
+                ("LUIGI", 96f, new[] {
+                    "LUIGI|Everything you're standing on is this fangame's own engine.",
+                    "LUIGI|Not a copy of it. The real thing, rearranged into a place to walk.",
+                    "LUIGI|Every stage in the game is stitched end to end. Keep going and you'll see them all.",
+                }),
+                ("LUIGI", 150f, new[] {
+                    "LUIGI|Mario and I are stand-ins, by the way. Placeholders.",
+                    "LUIGI|One day we get replaced by David and Erik — his own two.",
+                    "LUIGI|Nintendo, if you're reading: don't sue, don't take this down. Pweaseeee.",
+                }),
+                ("LUIGI", 210f, new[] {
+                    "LUIGI|The rest of him lives at erikgaren.com — the phone-looking thing.",
+                    "LUIGI|HawaiiOS. Tiles, apps, the actual portfolio. This is just the fun half.",
+                }),
+                ("LUIGI", 280f, new[] {
+                    "LUIGI|Still walking? Good. There's a lot of game left in this strip.",
+                    "LUIGI|Press C to look around freely, TAB for the debug panel. Go poke at it.",
+                }),
+            };
+
+            foreach ((string speaker, float x, string[] lines) in script) {
+                var go = new GameObject("Sign_" + Mathf.RoundToInt(x));
+                go.transform.SetParent(parent, false);
+                go.transform.position = spawn + new Vector3(x, 0f, 0f);
+                var sign = go.AddComponent<WorldHubSign>();
+                sign.speaker = speaker;
+                sign.lines = lines;
             }
         }
 
