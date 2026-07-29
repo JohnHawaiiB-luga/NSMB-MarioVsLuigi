@@ -1,4 +1,4 @@
-using NSMB.UI.MainMenu;
+using NSMB.UI.Elements;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -20,6 +20,10 @@ namespace NSMB.World {
     public class WorldMenuInjector : MonoBehaviour {
 
         private const string ButtonName = "BtnWorldHub";
+
+        // The empty height between Addons (.55) and About (.25) in their own
+        // column — room for one more button without moving any of theirs.
+        private const float ButtonSlot = 0.45f;
 
         private Button worldButton;
         private GameObject blurb;
@@ -87,7 +91,18 @@ namespace NSMB.World {
 
             var clone = Instantiate(play.gameObject, play.transform.parent);
             clone.name = ButtonName;
-            clone.transform.SetSiblingIndex(play.transform.GetSiblingIndex());
+
+            // Their menu has no layout group: each button is point-anchored at
+            // its own height (Play .85, Options .75, Replays .65, Addons .55,
+            // then a gap, then About .25 and Quit .15). A clone keeps Play's
+            // anchor, so it sat exactly on top of Play and looked missing.
+            // The gap is where a seventh button belongs.
+            var rect = clone.GetComponent<RectTransform>();
+            if (rect) {
+                rect.anchorMin = new Vector2(rect.anchorMin.x, ButtonSlot);
+                rect.anchorMax = new Vector2(rect.anchorMax.x, ButtonSlot);
+                rect.anchoredPosition = Vector2.zero;
+            }
 
             // The translation driver would overwrite our label on the next
             // language event; everything else of theirs is what makes the
@@ -114,25 +129,33 @@ namespace NSMB.World {
         }
 
         // Their buttons navigate by explicit up/down links rather than by
-        // position, so a new one has to be spliced into the chain by hand or
-        // the arrow keys walk straight past it.
+        // position, so a new one is invisible to the arrow keys until it is
+        // spliced in. Rather than patch two links and hope, rebuild the whole
+        // chain from where the buttons actually sit, top to bottom, wrapping at
+        // the ends.
         private void Link(Button play) {
-            Selectable above = play.navigation.selectOnUp;
+            var buttons = new List<Button>();
+            foreach (Transform child in play.transform.parent) {
+                if (child.gameObject.activeSelf
+                    && child.GetComponent<PipeButton>()
+                    && child.TryGetComponent(out Button button)
+                    && child.GetComponent<RectTransform>()) {
+                    buttons.Add(button);
+                }
+            }
+            if (buttons.Count < 2) {
+                return;
+            }
 
-            var mine = worldButton.navigation;
-            mine.mode = Navigation.Mode.Explicit;
-            mine.selectOnUp = above;
-            mine.selectOnDown = play;
-            worldButton.navigation = mine;
+            buttons.Sort((a, b) => b.GetComponent<RectTransform>().anchorMin.y
+                .CompareTo(a.GetComponent<RectTransform>().anchorMin.y));
 
-            var theirs = play.navigation;
-            theirs.selectOnUp = worldButton;
-            play.navigation = theirs;
-
-            if (above is Button aboveButton) {
-                var chain = aboveButton.navigation;
-                chain.selectOnDown = worldButton;
-                aboveButton.navigation = chain;
+            for (int i = 0; i < buttons.Count; i++) {
+                var nav = buttons[i].navigation;
+                nav.mode = Navigation.Mode.Explicit;
+                nav.selectOnUp = buttons[(i - 1 + buttons.Count) % buttons.Count];
+                nav.selectOnDown = buttons[(i + 1) % buttons.Count];
+                buttons[i].navigation = nav;
             }
         }
 
@@ -188,15 +211,14 @@ namespace NSMB.World {
             }
         }
 
-        // Their player keeps starting the menu theme after ours begins, so this
-        // has to run every tick rather than once when the theme is swapped.
+        // Stopping their player was a fight it kept winning: whatever drives the
+        // menu theme calls Play again, so every tick was stop, restart, stop —
+        // which is why their track kept surfacing over ours. Muting the source
+        // outlasts any number of Play calls.
         private void SilenceTheirs() {
             foreach (var player in FindObjectsByType<NSMB.Sound.LoopingMusicPlayer>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
-                if (player.AudioSource && player.AudioSource.isPlaying) {
-                    player.AudioSource.Stop();
-                }
-                if (player.enabled) {
-                    player.enabled = false;
+                if (player.AudioSource && !player.AudioSource.mute) {
+                    player.AudioSource.mute = true;
                 }
                 if (!silenced.Contains(player)) {
                     silenced.Add(player);
@@ -232,12 +254,10 @@ namespace NSMB.World {
                 Destroy(music.gameObject);
                 music = null;
             }
-            // Hand their player back: while it is disabled it cannot honour a
-            // track's authored loop points, so gameplay music would restart at
-            // the end of the file instead of at its loop.
+            // Give them their voice back on the way into gameplay.
             foreach (var player in silenced) {
-                if (player) {
-                    player.enabled = true;
+                if (player && player.AudioSource) {
+                    player.AudioSource.mute = false;
                 }
             }
             silenced.Clear();
