@@ -1,23 +1,22 @@
 using UnityEngine;
 
 namespace NSMB.World {
-    // Player 2. A real entity on the same physics as the player — walks, falls
-    // and jumps like anyone else, it just takes its orders from "stay near
-    // player one" instead of a keyboard.
-    [RequireComponent(typeof(CharacterController))]
+    // Player 2 on the same motor and the same numbers — follows, falls and
+    // jumps a beat behind player one.
+    [RequireComponent(typeof(WorldMotor))]
     public class CompanionNPC : MonoBehaviour {
 
         public Transform player;
         public Animator animator;
         public float followDistance = 1.6f;
 
-        private CharacterController controller;
+        private WorldMotor motor;
         private Vector3 horizontal;
         private float vy;
         private float jumpQueued;
 
         private void Awake() {
-            controller = GetComponent<CharacterController>();
+            motor = GetComponent<WorldMotor>();
             WorldPlayerController.Jumped += OnPlayerJumped;
         }
 
@@ -26,7 +25,6 @@ namespace NSMB.World {
         }
 
         private void OnPlayerJumped() {
-            // A beat behind, like a good player two.
             jumpQueued = Time.time + 0.18f;
         }
 
@@ -39,17 +37,13 @@ namespace NSMB.World {
             toPlayer.y = 0f;
             float dist = toPlayer.magnitude;
 
-            Vector3 wish = Vector3.zero;
-            if (dist > followDistance) {
-                wish = toPlayer.normalized;
-            }
-
+            Vector3 wish = dist > followDistance ? toPlayer.normalized : Vector3.zero;
             float cap = dist > 4f ? WorldPlayerController.SprintMax : WorldPlayerController.WalkMax;
             float rate = wish.sqrMagnitude < 0.001f ? WorldPlayerController.ReleaseDecel : WorldPlayerController.Accel;
             horizontal = Vector3.MoveTowards(horizontal, wish * cap, rate * Time.deltaTime);
 
             bool wantJump = jumpQueued > 0f && Time.time >= jumpQueued;
-            if (controller.isGrounded) {
+            if (motor.Grounded) {
                 vy = -0.5f;
                 if (wantJump) {
                     vy = WorldPlayerController.JumpVelocity;
@@ -61,7 +55,10 @@ namespace NSMB.World {
 
             Vector3 v = horizontal;
             v.y = vy;
-            controller.Move(v * Time.deltaTime);
+            motor.Move(v * Time.deltaTime);
+            if (motor.Grounded && vy < 0f) {
+                vy = -0.5f;
+            }
 
             if (horizontal.sqrMagnitude > 0.01f) {
                 transform.rotation = Quaternion.Slerp(transform.rotation,
@@ -69,9 +66,9 @@ namespace NSMB.World {
             }
 
             if (animator) {
-                animator.SetFloat("velocityMagnitude", new Vector2(controller.velocity.x, controller.velocity.z).magnitude);
-                animator.SetFloat("velocityY", controller.velocity.y);
-                animator.SetBool("onGround", controller.isGrounded);
+                animator.SetFloat("velocityMagnitude", new Vector2(motor.Velocity.x, motor.Velocity.z).magnitude);
+                animator.SetFloat("velocityY", motor.Velocity.y);
+                animator.SetBool("onGround", motor.Grounded);
                 animator.SetBool("crouching", false);
             }
         }

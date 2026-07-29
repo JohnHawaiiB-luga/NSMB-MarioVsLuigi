@@ -149,10 +149,14 @@ namespace NSMB.WorldEditor {
             // tiles), on the sim's own movement numbers.
             var player = new GameObject("Player");
             player.transform.position = new Vector3(0, 0.4f, -2f);
-            var cc = player.AddComponent<CharacterController>();
-            cc.height = 0.95f;
-            cc.radius = 0.22f;
-            cc.center = Vector3.up * 0.5f;
+            var pcap = player.AddComponent<CapsuleCollider>();
+            pcap.height = 0.95f;
+            pcap.radius = 0.22f;
+            pcap.center = Vector3.up * 0.5f;
+            var prb = player.AddComponent<Rigidbody>();
+            prb.isKinematic = true;
+            prb.useGravity = false;
+            player.AddComponent<WorldMotor>();
             var pctrl = player.AddComponent<WorldPlayerController>();
             var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 0.92f);
             pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
@@ -176,10 +180,14 @@ namespace NSMB.WorldEditor {
             // Player two: Luigi on the same physics, a real entity that follows.
             var npc = new GameObject("Companion");
             npc.transform.position = new Vector3(1.2f, 0.4f, -3f);
-            var ncc = npc.AddComponent<CharacterController>();
-            ncc.height = 1f;
-            ncc.radius = 0.22f;
-            ncc.center = Vector3.up * 0.52f;
+            var ncap = npc.AddComponent<CapsuleCollider>();
+            ncap.height = 1f;
+            ncap.radius = 0.22f;
+            ncap.center = Vector3.up * 0.52f;
+            var nrb = npc.AddComponent<Rigidbody>();
+            nrb.isKinematic = true;
+            nrb.useGravity = false;
+            npc.AddComponent<WorldMotor>();
             var comp = npc.AddComponent<CompanionNPC>();
             comp.player = player.transform;
             var luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 0.97f);

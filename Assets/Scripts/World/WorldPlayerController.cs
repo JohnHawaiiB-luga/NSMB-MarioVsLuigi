@@ -3,11 +3,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace NSMB.World {
-    // Third-person free-roam using the game's own movement numbers, taken
-    // verbatim from MarioPlayerPhysicsInfo: speed caps, acceleration, the jump
-    // impulse with its speed bonus, and the held-jump gravity curve. The world
-    // is built at native tile scale so these apply one-to-one.
-    [RequireComponent(typeof(CharacterController))]
+    // Free-roam on the game's own movement numbers (verbatim from
+    // MarioPlayerPhysicsInfo), carried by WorldMotor's cast-based capsule.
+    [RequireComponent(typeof(WorldMotor))]
     public class WorldPlayerController : MonoBehaviour {
 
         public const float WalkMax = 2.8125f;
@@ -23,13 +21,13 @@ namespace NSMB.World {
         public Animator animator;
         public static System.Action Jumped;
 
-        private CharacterController controller;
+        private WorldMotor motor;
         private Vector3 horizontal;
         private float vy;
         private float lastBeat;
 
         private void Awake() {
-            controller = GetComponent<CharacterController>();
+            motor = GetComponent<WorldMotor>();
         }
 
         private void Update() {
@@ -52,66 +50,48 @@ namespace NSMB.World {
                 wish.Normalize();
             }
 
-            // Horizontal: accelerate toward the wish velocity the way the sim
-            // does — walk accel normally, skid decel when reversing, release
-            // decel when idle.
             float cap = sprint ? SprintMax : WalkMax;
-            Vector3 target = wish * cap;
             float rate = wish.sqrMagnitude < 0.001f ? ReleaseDecel
                 : Vector3.Dot(horizontal, wish) < -0.01f ? SkidDecel
                 : Accel;
-            horizontal = Vector3.MoveTowards(horizontal, target, rate * Time.deltaTime);
+            horizontal = Vector3.MoveTowards(horizontal, wish * cap, rate * Time.deltaTime);
 
-            if (controller.isGrounded) {
+            if (motor.Grounded) {
                 vy = -0.5f;
                 if (kb.spaceKey.wasPressedThisFrame) {
                     vy = JumpVelocity + JumpSpeedBonus * (horizontal.magnitude / WalkMax);
                     Jumped?.Invoke();
                 }
             }
-
-            // The game's gravity curve: floaty while rising with jump held,
-            // heavier once released, heaviest falling; clamped at terminal.
             float g = vy > 2.109375f ? (jumpHeld ? -7.03125f : -28.125f)
                 : vy > 0f ? -28.125f
                 : -38.671875f;
             vy = Mathf.Max(vy + g * Time.deltaTime, TerminalFall);
 
-            Vector3 before = transform.position;
             Vector3 frameVelocity = horizontal;
             frameVelocity.y = vy;
-            controller.Move(frameVelocity * Time.deltaTime);
-            Vector3 moved = transform.position - before;
+            motor.Move(frameVelocity * Time.deltaTime);
+            if (motor.Grounded && vy < 0f) {
+                vy = -0.5f;
+            }
 
-            if (moved.sqrMagnitude > 0.000001f && wish.sqrMagnitude > 0.001f) {
-                Quaternion look = Quaternion.LookRotation(new Vector3(horizontal.x, 0, horizontal.z).normalized, Vector3.up);
-                transform.rotation = Quaternion.Slerp(transform.rotation, look, 14f * Time.deltaTime);
-            } else if (wish.sqrMagnitude > 0.001f) {
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(wish, Vector3.up), 14f * Time.deltaTime);
+            if (wish.sqrMagnitude > 0.001f) {
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                    Quaternion.LookRotation(wish, Vector3.up), 14f * Time.deltaTime);
             }
 
             if (animator) {
-                animator.SetFloat("velocityMagnitude", new Vector2(controller.velocity.x, controller.velocity.z).magnitude);
-                animator.SetFloat("velocityY", controller.velocity.y);
-                animator.SetBool("onGround", controller.isGrounded);
-                animator.SetBool("crouching", controller.isGrounded && z < 0f && x == 0f && sprint == false && kb.sKey.isPressed);
+                animator.SetFloat("velocityMagnitude", new Vector2(motor.Velocity.x, motor.Velocity.z).magnitude);
+                animator.SetFloat("velocityY", motor.Velocity.y);
+                animator.SetBool("onGround", motor.Grounded);
+                animator.SetBool("crouching", motor.Grounded && kb.sKey.isPressed && x == 0f);
             }
 
-            // Forensics: movement froze on production twice with no cause found.
-            // This names every condition that can freeze a CharacterController.
             if (Time.time - lastBeat > 2f) {
                 lastBeat = Time.time;
                 var sb = new StringBuilder();
-                sb.Append($"[World] pos={transform.position:F2} moved={moved.magnitude:F4} wish=({x:F0},{z:F0}) hvel={horizontal.magnitude:F2} vy={vy:F2} ");
-                sb.Append($"grounded={controller.isGrounded} ccEnabled={controller.enabled} active={gameObject.activeInHierarchy} dt={Time.deltaTime:F4} ts={Time.timeScale:F2}");
-                Vector3 p = transform.position + controller.center;
-                float half = Mathf.Max(0f, controller.height * 0.5f - controller.radius);
-                var hits = Physics.OverlapCapsule(p + Vector3.up * half, p - Vector3.up * half, controller.radius);
-                foreach (var h in hits) {
-                    if (h.transform.root != transform.root) {
-                        sb.Append($" overlap={h.name}");
-                    }
-                }
+                sb.Append($"[World] pos={transform.position:F2} wish=({x:F0},{z:F0}) hvel={horizontal.magnitude:F2} vy={vy:F2} ");
+                sb.Append($"grounded={motor.Grounded} realvel={motor.Velocity.magnitude:F2} dt={Time.deltaTime:F4}");
                 Debug.Log(sb.ToString());
             }
         }
