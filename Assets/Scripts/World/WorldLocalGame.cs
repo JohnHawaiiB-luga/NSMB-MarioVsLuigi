@@ -93,7 +93,10 @@ namespace NSMB.World {
                 SessionConfig = QuantumDeterministicSessionConfigAsset.DefaultConfig,
                 GameMode = DeterministicGameMode.Local,
                 RunnerId = "WORLDHUB",
-                PlayerCount = 1,
+                // Must match their multiplayer session: their gamemode code
+                // walks Constants.MaxPlayers and indexes player-sized data, so
+                // a smaller session reads out of bounds the moment play starts.
+                PlayerCount = Constants.MaxPlayers,
                 DeltaTimeType = SimulationUpdateTime.EngineDeltaTime,
             };
 
