@@ -39,6 +39,9 @@ namespace Quantum {
 
         private void HandleSpawningNewStarCoin(Frame f, VersusStageData stage) {
             int spawnpoints = stage.BigStarSpawnpoints.Length;
+            if (spawnpoints <= 0) {
+                return;
+            }
             ref BitSet64 usedSpawnpoints = ref f.Global->UsedStarSpawns;
 
             bool spawnedStarCoin = false;
@@ -47,6 +50,8 @@ namespace Quantum {
                 int setBits = usedSpawnpoints.GetSetCount();
                 if (setBits >= spawnpoints) {
                     usedSpawnpoints.ClearAll();
+                    // Same stale-count fault as BigStarSystem.
+                    setBits = 0;
                 }
 
                 int count = f.RNG->Next(0, spawnpoints - setBits);

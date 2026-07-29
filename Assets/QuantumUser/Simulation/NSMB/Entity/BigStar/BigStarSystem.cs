@@ -26,6 +26,9 @@ namespace Quantum {
 
         private void HandleSpawningNewStar(Frame f, VersusStageData stage) {
             int spawnpoints = stage.BigStarSpawnpoints.Length;
+            if (spawnpoints <= 0) {
+                return;
+            }
             ref BitSet64 usedSpawnpoints = ref f.Global->UsedStarSpawns;
 
             bool spawnedStar = false;
@@ -34,6 +37,10 @@ namespace Quantum {
                 int bitsSet = usedSpawnpoints.GetSetCount();
                 if (bitsSet >= spawnpoints) {
                     usedSpawnpoints.ClearAll();
+                    // Every spot was taken and has just been freed, so the
+                    // count below has to follow: leaving it stale asks the RNG
+                    // for a range of zero, which faults.
+                    bitsSet = 0;
                 }
 
                 int count = f.RNG->Next(0, spawnpoints - bitsSet);

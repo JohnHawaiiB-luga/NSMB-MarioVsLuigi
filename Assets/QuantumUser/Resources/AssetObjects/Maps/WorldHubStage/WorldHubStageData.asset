@@ -17,8 +17,8 @@ MonoBehaviour:
     Guid:
       Value: 519194837708055622
   ShowAuthorAndComposer: 0
-  StageAuthor: 
-  MusicComposer: 
+  StageAuthor: "David Erik Garc\xEDa Arenas"
+  MusicComposer: Nintendo
   TranslationKey: levels.custom.worldhub
   GroupingTranslationKey: 
   DiscordStageImage: 
@@ -43,12 +43,12 @@ MonoBehaviour:
     X:
       RawValue: 0
     Y:
-      RawValue: 0
+      RawValue: -229376
   SpawnpointArea:
     X:
-      RawValue: 0
+      RawValue: 91750
     Y:
-      RawValue: 0
+      RawValue: 52428
   OverrideAutomaticCameraSettings: 0
   CameraMinPosition:
     X:
@@ -68,13 +68,15 @@ MonoBehaviour:
   HidePlayersOnMinimap: 0
   BannedCoinItems: []
   SfxOverrides: []
-  MainMusic: []
+  MainMusic:
+  - Id:
+      Value: 412412404095479684
   InvincibleMusic:
     Id:
-      Value: 0
+      Value: 289056355789154037
   MegaMushroomMusic:
     Id:
-      Value: 0
+      Value: 451321131049702687
   TileData:
   - Tile:
       Id:
@@ -3278,30 +3280,18 @@ MonoBehaviour:
     Flags: 0
   BigStarSpawnpoints:
   - X:
-      RawValue: -720895
+      RawValue: -786432
     Y:
-      RawValue: -65536
+      RawValue: -262144
   - X:
-      RawValue: 425984
+      RawValue: -262144
     Y:
-      RawValue: -98304
+      RawValue: -262144
   - X:
-      RawValue: -950273
+      RawValue: 262144
     Y:
-      RawValue: -229375
+      RawValue: -262144
   - X:
-      RawValue: 753664
+      RawValue: 786432
     Y:
-      RawValue: -229375
-  - X:
-      RawValue: -278529
-    Y:
-      RawValue: -229375
-  - X:
-      RawValue: 933891
-    Y:
-      RawValue: -114687
-  - X:
-      RawValue: 196608
-    Y:
-      RawValue: -163839
+      RawValue: -262144

@@ -1,3 +1,4 @@
+using Photon.Deterministic;
 using Quantum;
 using Quantum.Editor;
 using System;
@@ -79,20 +80,11 @@ namespace NSMB.WorldEditor {
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
 
-            // A stage with no star spawn points makes BigStarSystem call
-            // RNG.Next(0, 0), which is a modulo by zero — the sim dies the
-            // instant play begins. The hub has no stars to chase, but the
-            // system still wants somewhere to put them.
-            if (stage.BigStarSpawnpoints == null || stage.BigStarSpawnpoints.Length == 0) {
-                var spots = new Photon.Deterministic.FPVector2[4];
-                for (int i = 0; i < spots.Length; i++) {
-                    spots[i] = new Photon.Deterministic.FPVector2(
-                        Photon.Deterministic.FP.FromFloat_UNSAFE(-6f + i * 4f),
-                        Photon.Deterministic.FP.FromFloat_UNSAFE(-4f));
-                }
-                stage.BigStarSpawnpoints = spots;
-                EditorUtility.SetDirty(stage);
-            }
+            // Saving the scene runs VersusStageBaker, which owns the tilemap
+            // and camera fields. Everything below is what it does not touch, so
+            // it has to be written after the bake and on every run.
+            Configure(stage);
+            EditorUtility.SetDirty(stage);
 
             // Quantum keeps its own asset database keyed by guid. New assets
             // must carry its label and the database must be rebuilt, or the
@@ -104,7 +96,71 @@ namespace NSMB.WorldEditor {
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
+            if (!Validate(stage)) {
+                return;
+            }
             Debug.Log($"[WorldStageBuilder] hub stage ready. Map guid: {map.Guid.Value}");
+        }
+
+        // Their simulation reads these without guarding, so an empty list or a
+        // zero here is a division by zero the moment gameplay starts. The hub
+        // died on exactly that twice: no star spawn points, then no music.
+        private static void Configure(VersusStageData stage) {
+            stage.TranslationKey = "levels.custom.worldhub";
+            stage.StageAuthor = "David Erik García Arenas";
+            stage.MusicComposer = "Nintendo";
+
+            // The hub runs the game's own main menu theme; world.ogg stays on
+            // the site's menu, where it belongs.
+            stage.MainMusic = new[] { Music("MusicMainMenu") };
+            stage.InvincibleMusic = Music("MusicStarman");
+            stage.MegaMushroomMusic = Music("MusicMegaMushroom");
+
+            // The plaza floor is two tile rows at y -12..-11, so its surface is
+            // world y -5. Spawn just above it, centred.
+            stage.Spawnpoint = new FPVector2(0, FP.FromFloat_UNSAFE(-3.5f));
+            stage.SpawnpointArea = new FPVector2(FP.FromFloat_UNSAFE(1.4f), FP.FromFloat_UNSAFE(0.8f));
+
+            var spots = new FPVector2[4];
+            for (int i = 0; i < spots.Length; i++) {
+                spots[i] = new FPVector2(FP.FromFloat_UNSAFE(-12f + i * 8f), FP.FromFloat_UNSAFE(-4f));
+            }
+            stage.BigStarSpawnpoints = spots;
+        }
+
+        private static AssetRef<LoopingMusicData> Music(string name) {
+            var asset = Load<LoopingMusicData>(
+                "Assets/QuantumUser/Resources/AssetObjects/Music/" + name + ".asset");
+            if (!asset) {
+                Debug.LogError($"[WorldStageBuilder] music asset {name} is missing");
+                return default;
+            }
+            return new AssetRef<LoopingMusicData>(asset.Guid);
+        }
+
+        // A bad stage used to surface as "remainder by zero" in the browser,
+        // half an hour and a deploy later. Catch it here instead.
+        private static bool Validate(VersusStageData stage) {
+            bool ok = true;
+            void Require(bool condition, string what) {
+                if (!condition) {
+                    Debug.LogError("[WorldStageBuilder] " + what);
+                    ok = false;
+                }
+            }
+
+            Require(stage.MainMusic != null && stage.MainMusic.Length > 0, "no main music: VersusStageData.GetCurrentMusic divides by MainMusic.Length");
+            Require(stage.MainMusic == null || Array.TrueForAll(stage.MainMusic, m => m.Id.IsValid), "a main music entry is an invalid asset reference");
+            Require(stage.BigStarSpawnpoints != null && stage.BigStarSpawnpoints.Length > 0, "no star spawn points: BigStarSystem divides by their count");
+            Require(stage.TileDimensions.X > 0 && stage.TileDimensions.Y > 0, $"tile dimensions are {stage.TileDimensions} — the bake did not run");
+            Require(stage.TileData != null && stage.TileData.Length == stage.TileDimensions.X * stage.TileDimensions.Y,
+                $"tile data is {(stage.TileData == null ? 0 : stage.TileData.Length)} entries, expected {stage.TileDimensions.X * stage.TileDimensions.Y}");
+
+            if (ok) {
+                Debug.Log($"[WorldStageBuilder] stage validated: {stage.TileDimensions.X}x{stage.TileDimensions.Y} tiles, "
+                    + $"{stage.MainMusic.Length} track(s), {stage.BigStarSpawnpoints.Length} star spawn(s), spawn at {stage.Spawnpoint}");
+            }
+            return ok;
         }
 
         // A wide, safe plaza with a few things to jump on — their tiles, their
