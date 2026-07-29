@@ -55,9 +55,9 @@ namespace NSMB.World {
                     transform.position = new Vector3(transform.position.x, floorTop, transform.position.z);
                     Grounded = true;
                 }
-            } else if (transform.position.y < -6f) {
-                // Off the baked corridor and under the world: back to the start.
-                transform.position = new Vector3(0f, 0.5f, -2f);
+            } else if (transform.position.y < -12f) {
+                // Under the world entirely: back to the spawn pad.
+                transform.position = new Vector3(0f, 0.6f, -12f);
                 Grounded = false;
             }
 

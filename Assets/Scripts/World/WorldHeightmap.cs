@@ -1,15 +1,16 @@
 using UnityEngine;
 
 namespace NSMB.World {
-    // The builder bakes the corridor's floor heights in here — one sample per
-    // z unit. Physics-independent ground truth: if the cast-based motor gets
-    // nothing from PhysX, characters still stand on the world we built.
+    // The builder bakes the map's floor heights here on an x/z grid — physics-
+    // independent ground truth, so characters stand on the world we built even
+    // if PhysX queries come back empty.
     public class WorldHeightmap : MonoBehaviour {
 
         public static WorldHeightmap Instance { get; private set; }
 
-        public float zOrigin;
-        public float[] floorTops;
+        public float originX, originZ;
+        public int width, depth;
+        public float[] tops;
 
         private void Awake() {
             Instance = this;
@@ -18,14 +19,19 @@ namespace NSMB.World {
         public static bool TryGetFloor(Vector3 position, out float top) {
             top = 0f;
             var map = Instance;
-            if (!map || map.floorTops == null || map.floorTops.Length == 0) {
+            if (!map || map.tops == null || map.tops.Length == 0) {
                 return false;
             }
-            int i = Mathf.FloorToInt(position.z - map.zOrigin);
-            if (i < 0 || i >= map.floorTops.Length) {
+            int ix = Mathf.FloorToInt(position.x - map.originX);
+            int iz = Mathf.FloorToInt(position.z - map.originZ);
+            if (ix < 0 || iz < 0 || ix >= map.width || iz >= map.depth) {
                 return false;
             }
-            top = map.floorTops[i];
+            float t = map.tops[iz * map.width + ix];
+            if (float.IsNegativeInfinity(t)) {
+                return false;
+            }
+            top = t;
             return true;
         }
     }

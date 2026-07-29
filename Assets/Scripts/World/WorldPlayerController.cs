@@ -70,6 +70,13 @@ namespace NSMB.World {
             Vector3 forward = cam ? Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 right = Vector3.Cross(Vector3.up, forward);
             Vector3 wish = right * x + forward * z;
+
+            // In side view the game is 2.5D: the world stays 3D, the gameplay
+            // collapses onto one axis, exactly like the DS original.
+            var rig = cam ? cam.GetComponent<WorldCamera>() : null;
+            if (rig && rig.PlaneLocked) {
+                wish.x = 0f;
+            }
             if (wish.sqrMagnitude > 1f) {
                 wish.Normalize();
             }
