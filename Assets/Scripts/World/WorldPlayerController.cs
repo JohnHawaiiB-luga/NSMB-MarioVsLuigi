@@ -89,6 +89,22 @@ namespace NSMB.World {
                 wish.Normalize();
             }
 
+            // Dev-room flight: gravity off, jump rises, crouch sinks.
+            if (WorldDebugMenu.FlyMode) {
+                Vector3 flyVel = wish * (sprint ? SprintMax * 2f : SprintMax) * WorldDebugMenu.SpeedScale;
+                flyVel.y = (jumpHeld ? 5f : 0f) - (down ? 5f : 0f);
+                motor.Move(flyVel * Time.deltaTime);
+                if (wish.sqrMagnitude > 0.001f) {
+                    transform.rotation = Quaternion.Slerp(transform.rotation,
+                        Quaternion.LookRotation(wish, Vector3.up), 14f * Time.deltaTime);
+                }
+                if (animator) {
+                    animator.SetBool("onGround", false);
+                    animator.SetFloat("velocityY", flyVel.y);
+                }
+                return;
+            }
+
             // Ground pound: down in mid-air freezes you and drives you into the
             // floor, exactly like the game's signature move.
             if (!motor.Grounded && down && !groundpounding) {
@@ -107,7 +123,7 @@ namespace NSMB.World {
                 }
             } else {
                 crouched = motor.Grounded && down && wish.sqrMagnitude < 0.01f;
-                float cap = sprint ? SprintMax : WalkMax;
+                float cap = (sprint ? SprintMax : WalkMax) * WorldDebugMenu.SpeedScale;
                 if (crouched) {
                     cap = 0f;
                 }

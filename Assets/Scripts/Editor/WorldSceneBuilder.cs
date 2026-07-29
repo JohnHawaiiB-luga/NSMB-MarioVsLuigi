@@ -188,7 +188,8 @@ namespace NSMB.WorldEditor {
             nSpeaker.bubbleHeight = 1.5f;
 
             BuildBubble();
-            BuildControlsCard();
+            var card = BuildControlsCard();
+            BuildDebugMenu(pctrl, follow, card);
 
             // ---- doors, as properly sized warp pipes ---------------------------
             Portal("Door-HawaiiOS", new Vector3(6f, 0f, -14f), NeonBlue, "HawaiiOS\n<size=55%>press E</size>", null, "https://erikgaren.com/os");
@@ -479,7 +480,51 @@ namespace NSMB.WorldEditor {
 
         // ------------------------------------------------------------------- UI
 
-        private static void BuildControlsCard() {
+        // The dev room: Graphy's stats overlay, flight, speed, slow motion and
+        // teleports, in a panel wearing the game's own skin.
+        private static void BuildDebugMenu(WorldPlayerController player, WorldCamera rig, GameObject card) {
+            var canvasGo = new GameObject("DebugCanvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 50;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            var panel = new GameObject("Panel");
+            panel.transform.SetParent(canvasGo.transform, false);
+            var img = panel.AddComponent<Image>();
+            img.sprite = SpriteAsset("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px.png");
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 0.4f;
+            img.color = new Color(0.05f, 0.06f, 0.1f, 0.94f);
+            var prt = panel.GetComponent<RectTransform>();
+            prt.anchorMin = new Vector2(0.5f, 0.5f);
+            prt.anchorMax = new Vector2(0.5f, 0.5f);
+            prt.pivot = new Vector2(0.5f, 0.5f);
+            prt.sizeDelta = new Vector2(720f, 440f);
+
+            var body = MakeUguiText(panel.transform, "Body", "", 22f, Vector2.zero, new Vector2(670f, 400f), Color.white);
+            body.alignment = TextAlignmentOptions.TopLeft;
+
+            var menu = canvasGo.AddComponent<WorldDebugMenu>();
+            menu.panel = panel;
+            menu.body = body;
+            menu.player = player;
+            menu.rig = rig;
+            menu.controlsCard = card;
+            menu.graphyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Extensions/Graphy - Ultimate Stats Monitor/Prefab/[Graphy].prefab");
+            var ui = canvasGo.AddComponent<AudioSource>();
+            ui.playOnAwake = false;
+            ui.spatialBlend = 0f;
+            menu.ui = ui;
+            menu.moveClip = Clip("Assets/Sound/ui/cursor.ogg");
+            menu.selectClip = Clip("Assets/Sound/ui/decide.ogg");
+            panel.SetActive(false);
+        }
+
+        private static GameObject BuildControlsCard() {
             var canvasGo = new GameObject("ControlsCanvas");
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -499,7 +544,7 @@ namespace NSMB.WorldEditor {
             prt.anchorMax = new Vector2(0f, 1f);
             prt.pivot = new Vector2(0f, 1f);
             prt.anchoredPosition = new Vector2(26f, -26f);
-            prt.sizeDelta = new Vector2(452f, 232f);
+            prt.sizeDelta = new Vector2(452f, 252f);
 
             var text = MakeUguiText(panel.transform, "Controls",
                 "MOVE  arrows / WASD / stick\n" +
@@ -509,8 +554,9 @@ namespace NSMB.WorldEditor {
                 "TALK, ENTER PIPE  E / C / RB\n" +
                 "SWAP VIEW  Q / V / LB — free 3D or 2.5D side-on\n" +
                 "BACK TO MENU  Esc / Start\n" +
+                "DEV ROOM  Tab\n" +
                 "<size=80%>same scheme as Versus — rebind it in Options</size>",
-                20f, Vector2.zero, new Vector2(420f, 206f), Color.white);
+                20f, Vector2.zero, new Vector2(420f, 226f), Color.white);
             text.alignment = TextAlignmentOptions.TopLeft;
 
             var title = MakeUguiText(canvasGo.transform, "Title",
@@ -521,6 +567,7 @@ namespace NSMB.WorldEditor {
             trt.anchorMax = new Vector2(1f, 1f);
             trt.pivot = new Vector2(1f, 1f);
             title.alignment = TextAlignmentOptions.TopRight;
+            return panel;
         }
 
         // The speech bubble is a world-space canvas wearing the game's own
