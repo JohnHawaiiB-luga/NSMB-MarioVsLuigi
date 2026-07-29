@@ -10,18 +10,32 @@ namespace NSMB.World {
     [RequireComponent(typeof(WorldMotor))]
     public class WorldPlayerController : MonoBehaviour {
 
-        // MarioPlayerPhysicsInfo, verbatim.
-        public const float WalkMax = 2.8125f;
-        public const float SprintMax = 5.625f;
+        // MarioPlayerPhysicsInfo, verbatim — and live-tunable from the inspector,
+        // which is the whole point of having one.
+        public const float WalkMaxDefault = 2.8125f;
+        public const float SprintMaxDefault = 5.625f;
+        public const float JumpVelocityDefault = 6.62109375f;
+        public const float GravityScaleDefault = 1f;
+
+        public static float WalkMax = WalkMaxDefault;
+        public static float SprintMax = SprintMaxDefault;
+        public static float JumpVelocity = JumpVelocityDefault;
+        public static float GravityScale = GravityScaleDefault;
+
         public const float Accel = 3.955f;
         public const float ReleaseDecel = 3.9550781196f;
         public const float SkidDecel = 10.54687536f;
         public const float SkidMinVelocity = 4.6875f;
-        public const float JumpVelocity = 6.62109375f;
         public const float JumpSpeedBonus = 0.46875f;
         public const float JumpTripleBonus = 0.5f;
         public const float TerminalFall = -5.859375f;
         public const float GroundpoundVelocity = -9f;
+
+        // What the inspector reads back.
+        public static WorldPlayerController Active { get; private set; }
+        public Vector3 DebugVelocity => motor ? motor.Velocity : Vector3.zero;
+        public bool DebugGrounded => motor && motor.Grounded;
+        public int DebugJumpStage => jumpStage;
 
         public Transform cam;
         public Animator animator;
@@ -48,6 +62,7 @@ namespace NSMB.World {
         private bool crouched;
 
         private void Awake() {
+            Active = this;
             motor = GetComponent<WorldMotor>();
             controls = new Controls();
             controls.Player.Enable();
@@ -90,8 +105,8 @@ namespace NSMB.World {
             }
 
             // Dev-room flight: gravity off, jump rises, crouch sinks.
-            if (WorldDebugMenu.FlyMode) {
-                Vector3 flyVel = wish * (sprint ? SprintMax * 2f : SprintMax) * WorldDebugMenu.SpeedScale;
+            if (WorldDebugInspector.FlyMode) {
+                Vector3 flyVel = wish * (sprint ? SprintMax * 2f : SprintMax) * WorldDebugInspector.SpeedScale;
                 flyVel.y = (jumpHeld ? 5f : 0f) - (down ? 5f : 0f);
                 motor.Move(flyVel * Time.deltaTime);
                 if (wish.sqrMagnitude > 0.001f) {
@@ -123,7 +138,7 @@ namespace NSMB.World {
                 }
             } else {
                 crouched = motor.Grounded && down && wish.sqrMagnitude < 0.01f;
-                float cap = (sprint ? SprintMax : WalkMax) * WorldDebugMenu.SpeedScale;
+                float cap = (sprint ? SprintMax : WalkMax) * WorldDebugInspector.SpeedScale;
                 if (crouched) {
                     cap = 0f;
                 }
@@ -151,10 +166,10 @@ namespace NSMB.World {
                     }
                 }
 
-                float g = vy > 2.109375f ? (jumpHeld ? -7.03125f : -28.125f)
+                float g = (vy > 2.109375f ? (jumpHeld ? -7.03125f : -28.125f)
                     : vy > 0f ? -28.125f
-                    : -38.671875f;
-                vy = Mathf.Max(vy + g * Time.deltaTime, TerminalFall);
+                    : -38.671875f) * GravityScale;
+                vy = Mathf.Max(vy + g * Time.deltaTime, TerminalFall * Mathf.Max(1f, GravityScale));
             }
 
             Vector3 frameVelocity = horizontal;

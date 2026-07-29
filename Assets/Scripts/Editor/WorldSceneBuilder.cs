@@ -189,7 +189,7 @@ namespace NSMB.WorldEditor {
 
             BuildBubble();
             var card = BuildControlsCard();
-            BuildDebugMenu(pctrl, follow, card);
+            BuildDebugMenu(pctrl, follow, card, light);
 
             // ---- doors, as properly sized warp pipes ---------------------------
             Portal("Door-HawaiiOS", new Vector3(6f, 0f, -14f), NeonBlue, "HawaiiOS\n<size=55%>press E</size>", null, "https://erikgaren.com/os");
@@ -480,10 +480,10 @@ namespace NSMB.WorldEditor {
 
         // ------------------------------------------------------------------- UI
 
-        // The dev room: Graphy's stats overlay, flight, speed, slow motion and
-        // teleports, in a panel wearing the game's own skin.
-        private static void BuildDebugMenu(WorldPlayerController player, WorldCamera rig, GameObject card) {
-            var canvasGo = new GameObject("DebugCanvas");
+        // The inspector: categories, kill switches, visualizers, live counters
+        // and tunable physics — the Dragon Engine's e_dip_* idea, our content.
+        private static void BuildDebugMenu(WorldPlayerController player, WorldCamera rig, GameObject card, Light sun) {
+            var canvasGo = new GameObject("InspectorCanvas");
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 50;
@@ -497,31 +497,57 @@ namespace NSMB.WorldEditor {
             img.sprite = SpriteAsset("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px.png");
             img.type = Image.Type.Sliced;
             img.pixelsPerUnitMultiplier = 0.4f;
-            img.color = new Color(0.05f, 0.06f, 0.1f, 0.94f);
+            img.color = new Color(0.04f, 0.05f, 0.09f, 0.95f);
             var prt = panel.GetComponent<RectTransform>();
             prt.anchorMin = new Vector2(0.5f, 0.5f);
             prt.anchorMax = new Vector2(0.5f, 0.5f);
             prt.pivot = new Vector2(0.5f, 0.5f);
-            prt.sizeDelta = new Vector2(720f, 440f);
+            prt.sizeDelta = new Vector2(1180f, 560f);
 
-            var body = MakeUguiText(panel.transform, "Body", "", 22f, Vector2.zero, new Vector2(670f, 400f), Color.white);
-            body.alignment = TextAlignmentOptions.TopLeft;
+            var left = MakeUguiText(panel.transform, "Categories", "", 22f,
+                new Vector2(26f, -22f), new Vector2(240f, 500f), Color.white);
+            left.alignment = TextAlignmentOptions.TopLeft;
+            var lrt = left.rectTransform;
+            lrt.anchorMin = new Vector2(0f, 1f);
+            lrt.anchorMax = new Vector2(0f, 1f);
+            lrt.pivot = new Vector2(0f, 1f);
 
-            var menu = canvasGo.AddComponent<WorldDebugMenu>();
-            menu.panel = panel;
-            menu.body = body;
-            menu.player = player;
-            menu.rig = rig;
-            menu.controlsCard = card;
-            menu.graphyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+            var right = MakeUguiText(panel.transform, "Properties", "", 21f,
+                new Vector2(290f, -22f), new Vector2(860f, 470f), Color.white);
+            right.alignment = TextAlignmentOptions.TopLeft;
+            var rrt = right.rectTransform;
+            rrt.anchorMin = new Vector2(0f, 1f);
+            rrt.anchorMax = new Vector2(0f, 1f);
+            rrt.pivot = new Vector2(0f, 1f);
+
+            var footer = MakeUguiText(panel.transform, "Footer", "", 17f,
+                new Vector2(0f, 18f), new Vector2(1100f, 28f), new Color(1f, 1f, 1f, 0.55f));
+            var frt = footer.rectTransform;
+            frt.anchorMin = new Vector2(0.5f, 0f);
+            frt.anchorMax = new Vector2(0.5f, 0f);
+            frt.pivot = new Vector2(0.5f, 0f);
+
+            var inspector = canvasGo.AddComponent<WorldDebugInspector>();
+            inspector.panel = panel;
+            inspector.left = left;
+            inspector.right = right;
+            inspector.footer = footer;
+            inspector.player = player;
+            inspector.rig = rig;
+            inspector.sun = sun;
+            inspector.controlsCard = card;
+            inspector.graphyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/Extensions/Graphy - Ultimate Stats Monitor/Prefab/[Graphy].prefab");
             var ui = canvasGo.AddComponent<AudioSource>();
             ui.playOnAwake = false;
             ui.spatialBlend = 0f;
-            menu.ui = ui;
-            menu.moveClip = Clip("Assets/Sound/ui/cursor.ogg");
-            menu.selectClip = Clip("Assets/Sound/ui/decide.ogg");
+            inspector.ui = ui;
+            inspector.moveClip = Clip("Assets/Sound/ui/cursor.ogg");
+            inspector.selectClip = Clip("Assets/Sound/ui/decide.ogg");
+            inspector.openClip = Clip("Assets/Sound/ui/pause.ogg");
             panel.SetActive(false);
+
+            canvasGo.AddComponent<WorldDebugDraw>();
         }
 
         private static GameObject BuildControlsCard() {
@@ -554,7 +580,7 @@ namespace NSMB.WorldEditor {
                 "TALK, ENTER PIPE  E / C / RB\n" +
                 "SWAP VIEW  Q / V / LB — free 3D or 2.5D side-on\n" +
                 "BACK TO MENU  Esc / Start\n" +
-                "DEV ROOM  Tab\n" +
+                "INSPECTOR  Tab\n" +
                 "<size=80%>same scheme as Versus — rebind it in Options</size>",
                 20f, Vector2.zero, new Vector2(420f, 226f), Color.white);
             text.alignment = TextAlignmentOptions.TopLeft;

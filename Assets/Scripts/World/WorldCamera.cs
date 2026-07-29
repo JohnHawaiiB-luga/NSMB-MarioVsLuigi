@@ -35,14 +35,18 @@ namespace NSMB.World {
             controls?.Dispose();
         }
 
+        public void ToggleView() {
+            targetBlend = targetBlend > 0.5f ? 0f : 1f;
+            if (swapClip) {
+                AudioSource.PlayClipAtPoint(swapClip, transform.position, 0.7f);
+            }
+        }
+
         private void Update() {
             // Reserve Item (Q / V / LB) has nothing to hold in free roam, so it
             // swaps the view — their binding, their gamepad button, no new keys.
             if (controls != null && controls.Player.ReserveItem.WasPressedThisFrame()) {
-                targetBlend = targetBlend > 0.5f ? 0f : 1f;
-                if (swapClip) {
-                    AudioSource.PlayClipAtPoint(swapClip, transform.position, 0.7f);
-                }
+                ToggleView();
             }
             blend = Mathf.MoveTowards(blend, targetBlend, blendSpeed * Time.deltaTime);
         }
