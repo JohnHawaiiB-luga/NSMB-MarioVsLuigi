@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace NSMB.World {
@@ -12,6 +11,16 @@ namespace NSMB.World {
         public string url;
 
         private bool playerInside;
+        private Controls controls;
+
+        private void Awake() {
+            controls = new Controls();
+            controls.Player.Enable();
+        }
+
+        private void OnDestroy() {
+            controls?.Dispose();
+        }
 
         private void OnTriggerEnter(Collider other) {
             if (other.GetComponent<WorldPlayerController>()) {
@@ -29,8 +38,8 @@ namespace NSMB.World {
             if (!playerInside || WorldDialogue.IsOpen) {
                 return;
             }
-            Keyboard kb = Keyboard.current;
-            if (kb == null || !kb.eKey.wasPressedThisFrame) {
+            // Powerup Action (E / C / RB) — the game's own "do the thing" button.
+            if (controls == null || !controls.Player.PowerupAction.WasPressedThisFrame()) {
                 return;
             }
             if (!string.IsNullOrEmpty(sceneName)) {

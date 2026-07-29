@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace NSMB.World {
     // Two cameras in one: the 3D chase view, and the game's own side-on 2D view.
@@ -24,9 +23,21 @@ namespace NSMB.World {
         private float targetBlend;
         private Vector3 velocity;
 
+        private Controls controls;
+
+        private void Awake() {
+            controls = new Controls();
+            controls.Player.Enable();
+        }
+
+        private void OnDestroy() {
+            controls?.Dispose();
+        }
+
         private void Update() {
-            var kb = Keyboard.current;
-            if (kb != null && kb.cKey.wasPressedThisFrame) {
+            // Reserve Item (Q / V / LB) has nothing to hold in free roam, so it
+            // swaps the view — their binding, their gamepad button, no new keys.
+            if (controls != null && controls.Player.ReserveItem.WasPressedThisFrame()) {
                 targetBlend = targetBlend > 0.5f ? 0f : 1f;
             }
             blend = Mathf.MoveTowards(blend, targetBlend, blendSpeed * Time.deltaTime);

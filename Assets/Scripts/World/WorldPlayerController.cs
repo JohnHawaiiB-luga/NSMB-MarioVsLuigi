@@ -31,6 +31,9 @@ namespace NSMB.World {
 
         public static System.Action Jumped;
 
+        // The game's own input actions: same bindings, same gamepad support and
+        // the same remapping its Options menu already offers.
+        private Controls controls;
         private WorldMotor motor;
         private Vector3 horizontal;
         private float vy;
@@ -46,26 +49,31 @@ namespace NSMB.World {
 
         private void Awake() {
             motor = GetComponent<WorldMotor>();
+            controls = new Controls();
+            controls.Player.Enable();
+            controls.UI.Enable();
+        }
+
+        private void OnDestroy() {
+            controls?.Dispose();
         }
 
         private void Update() {
-            Keyboard kb = Keyboard.current;
-            if (kb == null) {
+            if (controls == null) {
                 return;
             }
-            if (kb.escapeKey.wasPressedThisFrame) {
+            if (controls.UI.Pause.WasPressedThisFrame()) {
                 SceneManager.LoadScene("MainMenu");
                 return;
             }
 
-            float x = (kb.dKey.isPressed || kb.rightArrowKey.isPressed ? 1f : 0f)
-                    - (kb.aKey.isPressed || kb.leftArrowKey.isPressed ? 1f : 0f);
-            float z = (kb.wKey.isPressed || kb.upArrowKey.isPressed ? 1f : 0f)
-                    - (kb.sKey.isPressed || kb.downArrowKey.isPressed ? 1f : 0f);
-            bool down = kb.sKey.isPressed || kb.downArrowKey.isPressed;
-            bool sprint = kb.shiftKey.isPressed;
-            bool jumpHeld = kb.spaceKey.isPressed;
-            bool jumpPressed = kb.spaceKey.wasPressedThisFrame;
+            Vector2 move = controls.Player.Movement.ReadValue<Vector2>();
+            float x = move.x;
+            float z = move.y;
+            bool down = move.y < -0.4f;
+            bool sprint = controls.Player.Sprint.IsPressed();
+            bool jumpHeld = controls.Player.Jump.IsPressed();
+            bool jumpPressed = controls.Player.Jump.WasPressedThisFrame();
 
             Vector3 forward = cam ? Vector3.ProjectOnPlane(cam.forward, Vector3.up).normalized : Vector3.forward;
             Vector3 right = Vector3.Cross(Vector3.up, forward);

@@ -492,14 +492,14 @@ namespace NSMB.WorldEditor {
             prt.sizeDelta = new Vector2(452f, 232f);
 
             var text = MakeUguiText(panel.transform, "Controls",
-                "MOVE  WASD / arrows\n" +
-                "RUN  hold Shift\n" +
-                "JUMP  Space — again on landing for double, triple\n" +
-                "CROUCH  hold S\n" +
-                "GROUND POUND  S in mid-air\n" +
-                "CAMERA  C — free 3D / 2.5D side view\n" +
-                "TALK, ENTER PIPE  E\n" +
-                "BACK TO MENU  Esc",
+                "MOVE  arrows / WASD / stick\n" +
+                "JUMP  Space / Z / A — again on landing: double, triple\n" +
+                "RUN  hold Shift / X\n" +
+                "CROUCH  hold down · GROUND POUND  down in mid-air\n" +
+                "TALK, ENTER PIPE  E / C / RB\n" +
+                "SWAP VIEW  Q / V / LB — free 3D or 2.5D side-on\n" +
+                "BACK TO MENU  Esc / Start\n" +
+                "<size=80%>same scheme as Versus — rebind it in Options</size>",
                 20f, Vector2.zero, new Vector2(420f, 206f), Color.white);
             text.alignment = TextAlignmentOptions.TopLeft;
 

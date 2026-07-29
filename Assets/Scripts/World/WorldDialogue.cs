@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace NSMB.World {
     // Speech bubbles over the speakers' heads, name on top, advanced with E or
@@ -22,13 +21,20 @@ namespace NSMB.World {
         private WorldSpeaker[] speakers;
         private WorldSpeaker current;
         private float shownAt;
+        private Controls controls;
 
         private void Awake() {
             Instance = this;
             speakers = FindObjectsByType<WorldSpeaker>(FindObjectsSortMode.None);
+            controls = new Controls();
+            controls.Player.Enable();
             if (bubble) {
                 bubble.SetActive(false);
             }
+        }
+
+        private void OnDestroy() {
+            controls?.Dispose();
         }
 
         public static void Say(string defaultSpeaker, string[] lines) {
@@ -95,8 +101,7 @@ namespace NSMB.World {
                 bubble.transform.rotation = Quaternion.LookRotation(bubble.transform.position - cam.transform.position, Vector3.up);
             }
             bool advance = Time.time - shownAt > autoAdvanceSeconds;
-            Keyboard kb = Keyboard.current;
-            if (kb != null && kb.eKey.wasPressedThisFrame) {
+            if (controls != null && controls.Player.PowerupAction.WasPressedThisFrame()) {
                 advance = true;
             }
             if (advance) {
