@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 namespace NSMB.WorldEditor {
@@ -78,7 +79,7 @@ namespace NSMB.WorldEditor {
         private static void BuildHubScene() {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // NSMB grassland daylight, straight out of the source material.
+            // NSMB daylight, straight out of the source material.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.72f, 0.74f, 0.78f);
             RenderSettings.fog = false;
@@ -90,106 +91,135 @@ namespace NSMB.WorldEditor {
             light.color = new Color(1f, 0.98f, 0.92f);
             lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
-            // Ground and cliffs: chunky blocks textured with the game's grassland
-            // atlas — the exact tiles the Versus levels are built from.
+            // ------------------------------------------------------------------
+            // The test map: slices of the game's actual Versus stages, extruded
+            // from their tilemaps into 3D corridors laid end to end. Native tile
+            // scale — one tile is one unit — so the sim's movement numbers apply.
+            // ------------------------------------------------------------------
             Material grassMat = SpriteMat(TopRowSprite("Assets/Sprites/Atlases/Terrain/grass.png"));
             Material blockMat = SpriteMat(FirstSprite("Assets/Sprites/Atlases/Terrain/animated-blocks.png", "animation_0"));
 
-            for (int gx = -3; gx <= 3; gx++) {
-                for (int gz = 0; gz < 56; gz++) {
-                    TexBlock("Ground", new Vector3(gx * 4f, -2f, gz * 4f), new Vector3(4f, 4f, 4f), grassMat);
+            float zCursor = 0f;
+            var sectionStarts = new List<float>();
+            string[] stages = {
+                "Assets/Scenes/Levels/DefaultGrassLevel.unity",
+                "Assets/Scenes/Levels/DefaultBrickLevel.unity",
+                "Assets/Scenes/Levels/DefaultCastle.unity",
+                "Assets/Scenes/Levels/DefaultPipes.unity",
+                "Assets/Scenes/Levels/DefaultSnow.unity",
+            };
+            foreach (string stagePath in stages) {
+                sectionStarts.Add(zCursor);
+                zCursor = ExtrudeSection(stagePath, zCursor, 34) + 2f;
+                // Connector floor between stages, and a safety pit floor below.
+                for (int i = 0; i < 6; i++) {
+                    TexBlock("Connector", new Vector3(0, -0.5f, zCursor + i), new Vector3(Lane, 1f, 1f), grassMat);
                 }
+                zCursor += 6f;
             }
-            for (int gz = 0; gz < 56; gz++) {
-                TexBlock("CliffL", new Vector3(-16f, 0f, gz * 4f), new Vector3(4f, 8f, 4f), grassMat);
-                TexBlock("CliffR", new Vector3(16f, 0f, gz * 4f), new Vector3(4f, 8f, 4f), grassMat);
+            float worldEnd = zCursor + 8f;
+            TexBlock("SpawnPad", new Vector3(0, -0.5f, -2f), new Vector3(Lane, 1f, 6f), grassMat);
+            var pit = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            pit.name = "CatchFloor";
+            pit.transform.position = new Vector3(0, -8f, worldEnd / 2f);
+            pit.transform.localScale = new Vector3(Lane * 3f, 1f, worldEnd + 40f);
+            pit.GetComponent<Renderer>().sharedMaterial = Mat(new Color(0.1f, 0.08f, 0.1f), false);
+            pit.isStatic = true;
+
+            // A few floating ?-blocks of our own between stages.
+            foreach (float z in new[] { sectionStarts[0] + 10f, sectionStarts[1] + 8f, sectionStarts[3] + 12f }) {
+                TexBlock("QBlock", new Vector3(0f, 2.6f, z), Vector3.one, blockMat);
             }
 
-            // Question blocks floating at classic bonk height along the walk.
-            foreach (float z in new[] { 24f, 26f, 28f, 70f, 110f, 112f, 150f, 190f }) {
-                TexBlock("QBlock", new Vector3((z % 8f) - 4f, 3.4f, z), new Vector3(2f, 2f, 2f), blockMat);
-            }
-
-            // The game's own sky as the horizon, and its overworld theme in the air.
-            Backdrop("SkyEnd", new Vector3(0, 24f, 240f), Quaternion.identity, new Vector2(260, 70));
-            Backdrop("SkyL", new Vector3(-55f, 24f, 110f), Quaternion.Euler(0, 90, 0), new Vector2(300, 70));
-            Backdrop("SkyR", new Vector3(55f, 24f, 110f), Quaternion.Euler(0, -90, 0), new Vector2(300, 70));
+            // The game's own sky wraps the horizon; results.ogg loops per the
+            // director's pick.
+            Backdrop("SkyEnd", new Vector3(0, 18f, worldEnd + 30f), Quaternion.identity, new Vector2(220, 60));
+            Backdrop("SkyL", new Vector3(-30f, 18f, worldEnd / 2f), Quaternion.Euler(0, 90, 0), new Vector2(worldEnd + 80, 60));
+            Backdrop("SkyR", new Vector3(30f, 18f, worldEnd / 2f), Quaternion.Euler(0, -90, 0), new Vector2(worldEnd + 80, 60));
 
             var musicGo = new GameObject("Music");
             var music = musicGo.AddComponent<AudioSource>();
-            music.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/music/overworld.ogg");
+            music.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/music/results.ogg");
             music.loop = true;
             music.playOnAwake = true;
             music.volume = 0.45f;
             music.spatialBlend = 0f;
 
-            // Player: the game's Mario model at human scale, animated by the
-            // game's own controller — the declared placeholder until David's model.
+            // Player: Mario at native scale (the sim's large hitbox is 0.82
+            // tiles), on the sim's own movement numbers.
             var player = new GameObject("Player");
-            player.transform.position = new Vector3(0, 0.3f, 2f);
+            player.transform.position = new Vector3(0, 0.4f, -2f);
             var cc = player.AddComponent<CharacterController>();
-            cc.height = 1.8f;
-            cc.radius = 0.35f;
-            cc.center = Vector3.up * 0.9f;
+            cc.height = 0.95f;
+            cc.radius = 0.22f;
+            cc.center = Vector3.up * 0.5f;
             var pctrl = player.AddComponent<WorldPlayerController>();
-            var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 1.75f);
+            var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 0.92f);
             pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
             Dress(marioVisual, "Assets/Materials/3d/mario/mat_mario_big.mat", "Assets/Materials/3d/mario/mat_mario_eyes.mat");
+            var pSpeaker = player.AddComponent<WorldSpeaker>();
+            pSpeaker.keyword = "DAVID";
+            pSpeaker.bubbleHeight = 1.35f;
 
             var camGo = new GameObject("Camera");
             var cam = camGo.AddComponent<Camera>();
             cam.tag = "MainCamera";
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.45f, 0.72f, 1f);
-            camGo.transform.position = new Vector3(0, 3.4f, -4f);
+            camGo.transform.position = new Vector3(0, 1.9f, -5f);
             var follow = camGo.AddComponent<WorldCamera>();
             follow.target = player.transform;
-            follow.offset = new Vector3(0f, 3.2f, -5.5f);
-            follow.lookHeight = 1.3f;
+            follow.offset = new Vector3(0f, 1.9f, -3.3f);
+            follow.lookHeight = 0.65f;
             pctrl.cam = camGo.transform;
 
-            // The companion.
+            // Player two: Luigi on the same physics, a real entity that follows.
             var npc = new GameObject("Companion");
-            npc.transform.position = new Vector3(2f, 0.3f, -1f);
+            npc.transform.position = new Vector3(1.2f, 0.4f, -3f);
+            var ncc = npc.AddComponent<CharacterController>();
+            ncc.height = 1f;
+            ncc.radius = 0.22f;
+            ncc.center = Vector3.up * 0.52f;
             var comp = npc.AddComponent<CompanionNPC>();
             comp.player = player.transform;
-            // Luigi as the narrator's placeholder body — the nervous brother who
-            // follows you around explaining things. Fitting.
-            var luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 1.85f);
+            var luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 0.97f);
+            comp.animator = WireAnimator(luigiVisual, "Assets/Animations/Player/Luigi/LargeLuigi.overrideController");
             Dress(luigiVisual, "Assets/Materials/3d/luigi/mat_luigi_big.mat", "Assets/Materials/3d/luigi/mat_luigi_eyes.mat");
-            FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 2.4f);
+            FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 1.75f);
+            var nSpeaker = npc.AddComponent<WorldSpeaker>();
+            nSpeaker.keyword = "ERIK";
+            nSpeaker.bubbleHeight = 1.5f;
 
-            // Dialogue UI.
-            BuildDialogueUi();
+            // Speech bubbles with the game's font and its chat SFX.
+            BuildBubble();
 
-            // The story beats along the street — a conversation between the two of
-            // them, placeholder bodies acknowledged in-fiction.
-            Trigger(new Vector3(0, 1, 6),
+            // Story beats at each stage section — a conversation between the two
+            // of them, placeholder bodies acknowledged in-fiction.
+            Trigger(new Vector3(0, 1, sectionStarts[0] + 3f),
                 "ERIK (luigi.tmp)|Oh! A visitor! Welcome to the World. I'm Erik — or I will be, once the boss sculpts me a body. For now I'm, um. Borrowing Luigi.",
                 "DAVID (mario.tmp)|And I'm David — same person as Erik, long story, good lore. Currently shaped like a certain plumber. Nintendo, if you're reading this: placeholders! Temporary! Don't sue, pweaseeee.",
-                "ERIK (luigi.tmp)|He's serious, there's a roadmap and everything. Anyway — this street is his portfolio. Walk on, we'll explain him as we go.");
-            Trigger(new Vector3(0, 1, 40),
+                "ERIK (luigi.tmp)|He's serious, there's a roadmap and everything. This test map is stitched from the Versus stages — walk on, we'll explain him as we go.");
+            Trigger(new Vector3(0, 1, sectionStarts[1] + 3f),
                 "ERIK (luigi.tmp)|Day job: at a BMW supplier he designed the team's pre-delivery QA tool. 1,300 automated checks on 3D vehicle data, every single release.",
                 "DAVID (mario.tmp)|It caught real defects before they shipped. I was 21 when I built it. Still am, actually.");
-            Trigger(new Vector3(0, 1, 80),
+            Trigger(new Vector3(0, 1, sectionStarts[2] + 3f),
                 "ERIK (luigi.tmp)|Night job: he reverse-engineers console games. PS4 binary, shaders translated to SPIR-V, his own Vulkan renderer. He fixed hair that emulators get wrong.",
                 "DAVID (mario.tmp)|Frame 1377. The hair rendered. I told everyone. Repeatedly.",
-                "ERIK (luigi.tmp)|The blue door here leads to HawaiiOS — the operating system he built for this website. Press E at any door to step through.");
-            Trigger(new Vector3(0, 1, 120),
+                "ERIK (luigi.tmp)|The green pipes are doors — stand on top of the story and press E. One leads to HawaiiOS, the operating system he built for this website.");
+            Trigger(new Vector3(0, 1, sectionStarts[3] + 3f),
                 "ERIK (luigi.tmp)|He sculpts too — Blender, EEVEE, Yakuza and Final Fantasy things. Which is how we eventually get faces that aren't... these.",
-                "DAVID (mario.tmp)|The arcade at the end runs the classic Versus game this World grew out of — by ipodtouch0218 and contributors, used with permission. Bring a friend, it's real multiplayer on my own server.");
+                "DAVID (mario.tmp)|The pipe at the end runs the classic Versus game this World grew out of — by ipodtouch0218 and contributors, used with permission. Bring a friend, it's real multiplayer on my own server.");
 
-            // Doors.
-            Portal("Door-HawaiiOS", new Vector3(-11f, 0, 85f), NeonBlue, "HawaiiOS\n<size=55%>his operating system — press E</size>", null, "https://erikgaren.com/os");
-            Portal("Door-Portfolio", new Vector3(11f, 0, 45f), NeonCyan, "THE CV\n<size=55%>recruiter door — press E</size>", null, "https://erikgaren.com/");
-            Portal("Door-Versus", new Vector3(0f, 0, 170f), NeonRed, "THE ARCADE\n<size=55%>versus — the classic, press E</size>", "Intro", null);
+            // Doors: warp pipes on the connectors between stages.
+            Portal("Door-HawaiiOS", new Vector3(2.4f, 0, sectionStarts[1] - 5f), NeonBlue, "HawaiiOS\n<size=55%>his operating system — press E</size>", null, "https://erikgaren.com/os");
+            Portal("Door-Portfolio", new Vector3(-2.4f, 0, sectionStarts[2] - 5f), NeonCyan, "THE CV\n<size=55%>recruiter door — press E</size>", null, "https://erikgaren.com/");
+            Portal("Door-Versus", new Vector3(0f, 0, worldEnd - 3f), NeonRed, "THE ARCADE\n<size=55%>versus — the classic, press E</size>", "Intro", null);
 
             // Dev-room fun facts floating around.
-            DevFact(new Vector3(-6, 3.5f, 22), "// TODO: replace placeholder plumbers\n// legal says hi");
-            DevFact(new Vector3(7, 4.5f, 62), "assert(checks_passed == 1300); // every release");
-            DevFact(new Vector3(-7, 5f, 100), "frame 1377: the hair finally rendered.\nnobody saw. everybody was told.");
-            DevFact(new Vector3(6, 3.8f, 140), "wagata, yondaime!");
-            DevFact(new Vector3(-5, 3f, 55), "// he glides instead of walking.\n// not a bug: animations arrive with the real characters");
+            DevFact(new Vector3(-2.4f, 2.2f, sectionStarts[0] + 12f), "// TODO: replace placeholder plumbers\n// legal says hi");
+            DevFact(new Vector3(2.6f, 2.6f, sectionStarts[1] + 12f), "assert(checks_passed == 1300); // every release");
+            DevFact(new Vector3(-2.6f, 2.8f, sectionStarts[2] + 12f), "frame 1377: the hair finally rendered.\nnobody saw. everybody was told.");
+            DevFact(new Vector3(2.4f, 2.2f, sectionStarts[4] + 12f), "wagata, yondaime!");
 
             EditorSceneManager.SaveScene(scene, "Assets/Scenes/WorldHub.unity");
         }
@@ -312,9 +342,9 @@ namespace NSMB.WorldEditor {
                 tmp.font = GameFont;
             }
             tmp.text = text;
-            tmp.fontSize = 3.2f;
+            tmp.fontSize = 1.15f;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.rectTransform.sizeDelta = new Vector2(8, 2);
+            tmp.rectTransform.sizeDelta = new Vector2(4.5f, 1.2f);
             go.AddComponent<Billboard>();
         }
 
@@ -323,10 +353,10 @@ namespace NSMB.WorldEditor {
             go.transform.position = pos;
             var tmp = go.AddComponent<TextMeshPro>();
             tmp.text = text;
-            tmp.fontSize = 2.4f;
+            tmp.fontSize = 1f;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = new Color(0.12f, 0.25f, 0.1f, 0.9f);
-            tmp.rectTransform.sizeDelta = new Vector2(12, 3);
+            tmp.rectTransform.sizeDelta = new Vector2(6.5f, 2f);
             go.AddComponent<Billboard>();
         }
 
@@ -335,7 +365,7 @@ namespace NSMB.WorldEditor {
             go.transform.position = pos;
             var box = go.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.size = new Vector3(26, 6, 4);
+            box.size = new Vector3(Lane, 3f, 1.5f);
             var trig = go.AddComponent<WorldDialogueTrigger>();
             trig.lines = lines;
         }
@@ -346,12 +376,12 @@ namespace NSMB.WorldEditor {
             Pipe(root.transform, c);
             var box = root.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.center = new Vector3(0, 1.5f, 0);
-            box.size = new Vector3(4.5f, 3.5f, 4.5f);
+            box.center = new Vector3(0, 0.9f, 0);
+            box.size = new Vector3(2.4f, 2f, 2.4f);
             var portal = root.AddComponent<WorldPortal>();
             portal.sceneName = sceneName;
             portal.url = url;
-            FloatingLabel(root.transform, label, 4.6f);
+            FloatingLabel(root.transform, label, 2.5f);
         }
 
         // A warp pipe — the only correct shape for a door in this universe. The
@@ -361,20 +391,20 @@ namespace NSMB.WorldEditor {
             var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             shaft.name = "Shaft";
             shaft.transform.SetParent(parent, false);
-            shaft.transform.localPosition = new Vector3(0, 1.1f, 0);
-            shaft.transform.localScale = new Vector3(2.2f, 1.1f, 2.2f);
+            shaft.transform.localPosition = new Vector3(0, 0.6f, 0);
+            shaft.transform.localScale = new Vector3(1.25f, 0.6f, 1.25f);
             shaft.GetComponent<Renderer>().sharedMaterial = Mat(body, false);
             var lip = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             lip.name = "Lip";
             lip.transform.SetParent(parent, false);
-            lip.transform.localPosition = new Vector3(0, 2.35f, 0);
-            lip.transform.localScale = new Vector3(2.7f, 0.25f, 2.7f);
+            lip.transform.localPosition = new Vector3(0, 1.28f, 0);
+            lip.transform.localScale = new Vector3(1.5f, 0.14f, 1.5f);
             lip.GetComponent<Renderer>().sharedMaterial = Mat(body * 1.15f, false);
             var mouth = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             mouth.name = "Mouth";
             mouth.transform.SetParent(parent, false);
-            mouth.transform.localPosition = new Vector3(0, 2.5f, 0);
-            mouth.transform.localScale = new Vector3(2.2f, 0.06f, 2.2f);
+            mouth.transform.localPosition = new Vector3(0, 1.37f, 0);
+            mouth.transform.localScale = new Vector3(1.25f, 0.035f, 1.25f);
             mouth.GetComponent<Renderer>().sharedMaterial = Mat(new Color(0.05f, 0.12f, 0.06f), false);
             Object.DestroyImmediate(shaft.GetComponent<Collider>());
             Object.DestroyImmediate(lip.GetComponent<Collider>());
@@ -434,34 +464,135 @@ namespace NSMB.WorldEditor {
             go.isStatic = true;
         }
 
-        private static void BuildDialogueUi() {
-            var canvasGo = new GameObject("DialogueCanvas");
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
+        private const float Lane = 8f;
 
-            var panel = new GameObject("Panel");
-            panel.transform.SetParent(canvasGo.transform, false);
-            var img = panel.AddComponent<Image>();
-            img.color = new Color(0f, 0f, 0f, 0.72f);
-            var prt = panel.GetComponent<RectTransform>();
-            prt.anchorMin = new Vector2(0.5f, 0f);
-            prt.anchorMax = new Vector2(0.5f, 0f);
-            prt.pivot = new Vector2(0.5f, 0f);
-            prt.anchoredPosition = new Vector2(0, 40);
-            prt.sizeDelta = new Vector2(1250, 170);
+        // Opens a level scene additively, finds its most-used tilemap (the solid
+        // layer), and extrudes a horizontal slice of it into corridor geometry:
+        // each tile becomes a lane-wide box, so the stage's side profile turns
+        // into walkable 3D floors, steps, platforms and pits. Returns the z
+        // where the slice ends.
+        private static float ExtrudeSection(string scenePath, float zStart, int sliceWidth) {
+            var level = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
+            try {
+                Tilemap best = null;
+                int bestCount = 0;
+                foreach (var root in level.GetRootGameObjects()) {
+                    foreach (var tm in root.GetComponentsInChildren<Tilemap>(true)) {
+                        tm.CompressBounds();
+                        int count = tm.GetUsedTilesCount();
+                        if (count > bestCount) {
+                            best = tm;
+                            bestCount = count;
+                        }
+                    }
+                }
+                if (!best) {
+                    return zStart + sliceWidth;
+                }
 
-            var speaker = MakeUguiText(panel.transform, "Speaker", "ERIK", 26, new Vector2(0, 52), new Vector2(1150, 34), new Color(1f, 0.42f, 0.32f));
-            speaker.alignment = TextAlignmentOptions.Left;
-            var line = MakeUguiText(panel.transform, "Line", "", 27, new Vector2(0, -20), new Vector2(1150, 96), Color.white);
-            line.alignment = TextAlignmentOptions.TopLeft;
+                var b = best.cellBounds;
+                int x0 = b.xMin + 2;
+                int x1 = Mathf.Min(b.xMax, x0 + sliceWidth);
+                int yTop = Mathf.Min(b.yMax, b.yMin + 14);
 
-            var dlg = canvasGo.AddComponent<WorldDialogue>();
-            dlg.panel = panel;
-            dlg.speakerText = speaker;
-            dlg.lineText = line;
+                int floorY = int.MaxValue;
+                for (int lx = x0; lx < x1; lx++) {
+                    for (int ly = b.yMin; ly < yTop; ly++) {
+                        if (best.GetSprite(new Vector3Int(lx, ly, 0))) {
+                            floorY = Mathf.Min(floorY, ly);
+                        }
+                    }
+                }
+                if (floorY == int.MaxValue) {
+                    return zStart + sliceWidth;
+                }
+
+                var parent = new GameObject("Stage-" + System.IO.Path.GetFileNameWithoutExtension(scenePath));
+                var cache = new Dictionary<Sprite, Material>();
+                for (int lx = x0; lx < x1; lx++) {
+                    for (int ly = floorY; ly < yTop; ly++) {
+                        Sprite sprite = best.GetSprite(new Vector3Int(lx, ly, 0));
+                        if (!sprite) {
+                            continue;
+                        }
+                        if (!cache.TryGetValue(sprite, out var mat)) {
+                            mat = SpriteMat(sprite);
+                            cache[sprite] = mat;
+                        }
+                        var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        cube.name = "t";
+                        cube.transform.SetParent(parent.transform, false);
+                        // The slice's lowest tile row tops out at world y = 0.
+                        cube.transform.position = new Vector3(0f, ly - floorY - 0.5f, zStart + (lx - x0) + 0.5f);
+                        cube.transform.localScale = new Vector3(Lane, 1f, 1f);
+                        cube.GetComponent<Renderer>().sharedMaterial = mat;
+                        cube.isStatic = true;
+                    }
+                }
+                return zStart + (x1 - x0);
+            } finally {
+                EditorSceneManager.CloseScene(level, true);
+            }
+        }
+
+        // The over-head speech bubble: dark backing quad, name and line in the
+        // game's font, and the game's chat SFX as the voice blip.
+        private static void BuildBubble() {
+            var holder = new GameObject("Dialogue");
+            var dlg = holder.AddComponent<WorldDialogue>();
+
+            var bubble = new GameObject("Bubble");
+            bubble.transform.SetParent(holder.transform, false);
+
+            var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Object.DestroyImmediate(back.GetComponent<Collider>());
+            back.name = "Back";
+            back.transform.SetParent(bubble.transform, false);
+            back.transform.localScale = new Vector3(3.6f, 1.2f, 1f);
+            var backMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            backMat.SetColor("_BaseColor", new Color(0.02f, 0.04f, 0.08f, 0.88f));
+            backMat.SetFloat("_Surface", 1f);
+            backMat.SetOverrideTag("RenderType", "Transparent");
+            backMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            backMat.SetInt("_SrcBlend", (int) UnityEngine.Rendering.BlendMode.SrcAlpha);
+            backMat.SetInt("_DstBlend", (int) UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            backMat.SetInt("_ZWrite", 0);
+            backMat.renderQueue = 3000;
+            back.GetComponent<Renderer>().sharedMaterial = backMat;
+
+            var nameGo = new GameObject("Name");
+            nameGo.transform.SetParent(bubble.transform, false);
+            nameGo.transform.localPosition = new Vector3(0f, 0.68f, -0.01f);
+            var nameTmp = nameGo.AddComponent<TextMeshPro>();
+            if (GameFont) {
+                nameTmp.font = GameFont;
+            }
+            nameTmp.fontSize = 1.5f;
+            nameTmp.alignment = TextAlignmentOptions.Center;
+            nameTmp.rectTransform.sizeDelta = new Vector2(3.4f, 0.4f);
+
+            var lineGo = new GameObject("Line");
+            lineGo.transform.SetParent(bubble.transform, false);
+            lineGo.transform.localPosition = new Vector3(0f, 0.02f, -0.01f);
+            var lineTmp = lineGo.AddComponent<TextMeshPro>();
+            if (GameFont) {
+                lineTmp.font = GameFont;
+            }
+            lineTmp.fontSize = 1.1f;
+            lineTmp.alignment = TextAlignmentOptions.Top;
+            lineTmp.rectTransform.sizeDelta = new Vector2(3.35f, 1.05f);
+
+            var voice = holder.AddComponent<AudioSource>();
+            voice.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/ui/chat_fulltype.wav");
+            voice.playOnAwake = false;
+            voice.spatialBlend = 0f;
+            voice.volume = 0.65f;
+
+            dlg.bubble = bubble;
+            dlg.nameText = nameTmp;
+            dlg.lineText = lineTmp;
+            dlg.voice = voice;
+            bubble.SetActive(false);
         }
 
         private static TextMeshProUGUI MakeUguiText(Transform parent, string name, string text, float size, Vector2 pos, Vector2 dims, Color c) {

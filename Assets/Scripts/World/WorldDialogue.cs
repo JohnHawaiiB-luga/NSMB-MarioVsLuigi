@@ -3,30 +3,34 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace NSMB.World {
-    // One shared bottom-bar dialogue box. Lines queue up; E advances, or they
-    // advance themselves after a few seconds so nobody gets stuck.
+    // Speech bubbles over the speakers' heads, name on top, advanced with E or
+    // by themselves. Lines carry their speaker as "NAME|text"; the bubble hops
+    // to whichever WorldSpeaker matches the name.
     public class WorldDialogue : MonoBehaviour {
 
         public static WorldDialogue Instance { get; private set; }
-        public static bool IsOpen => Instance && Instance.panel.activeSelf;
+        public static bool IsOpen => Instance && Instance.bubble && Instance.bubble.activeSelf;
 
-        public GameObject panel;
-        public TMP_Text speakerText;
+        public GameObject bubble;
+        public TMP_Text nameText;
         public TMP_Text lineText;
+        public Transform panel;
+        public AudioSource voice;
         public float autoAdvanceSeconds = 5f;
 
         private readonly System.Collections.Generic.Queue<(string speaker, string line)> queue = new();
+        private WorldSpeaker[] speakers;
+        private WorldSpeaker current;
         private float shownAt;
 
         private void Awake() {
             Instance = this;
-            if (panel) {
-                panel.SetActive(false);
+            speakers = FindObjectsByType<WorldSpeaker>(FindObjectsSortMode.None);
+            if (bubble) {
+                bubble.SetActive(false);
             }
         }
 
-        // Lines may carry their own speaker as "NAME|text" — conversations, not
-        // monologue. Lines without a prefix fall back to the trigger's speaker.
         public static void Say(string defaultSpeaker, string[] lines) {
             if (!Instance) {
                 return;
@@ -39,29 +43,56 @@ namespace NSMB.World {
                     Instance.queue.Enqueue((defaultSpeaker, raw));
                 }
             }
-            if (!Instance.panel.activeSelf) {
+            if (!IsOpen) {
                 Instance.Next();
             }
         }
 
         private void Next() {
             if (queue.Count == 0) {
-                panel.SetActive(false);
+                bubble.SetActive(false);
+                current = null;
                 return;
             }
             (string speaker, string line) = queue.Dequeue();
-            panel.SetActive(true);
-            speakerText.text = speaker;
-            speakerText.color = speaker.Contains("DAVID") ? new Color(1f, 0.42f, 0.32f)
-                : speaker.Contains("ERIK") ? new Color(0.45f, 0.9f, 0.5f)
+            bubble.SetActive(true);
+            nameText.text = speaker;
+            nameText.color = speaker.Contains("DAVID") ? new Color(1f, 0.45f, 0.35f)
+                : speaker.Contains("ERIK") ? new Color(0.5f, 0.95f, 0.55f)
                 : Color.white;
             lineText.text = line;
             shownAt = Time.time;
+            current = Find(speaker);
+            if (voice && voice.clip) {
+                voice.PlayOneShot(voice.clip);
+            }
+            Place();
+        }
+
+        private WorldSpeaker Find(string speaker) {
+            foreach (var s in speakers) {
+                if (!string.IsNullOrEmpty(s.keyword) && speaker.ToUpperInvariant().Contains(s.keyword.ToUpperInvariant())) {
+                    return s;
+                }
+            }
+            return null;
+        }
+
+        private void Place() {
+            if (!current) {
+                return;
+            }
+            bubble.transform.position = current.transform.position + Vector3.up * current.bubbleHeight;
         }
 
         private void Update() {
-            if (!panel.activeSelf) {
+            if (!IsOpen) {
                 return;
+            }
+            Place();
+            Camera cam = Camera.main;
+            if (cam) {
+                bubble.transform.rotation = Quaternion.LookRotation(bubble.transform.position - cam.transform.position, Vector3.up);
             }
             bool advance = Time.time - shownAt > autoAdvanceSeconds;
             Keyboard kb = Keyboard.current;
