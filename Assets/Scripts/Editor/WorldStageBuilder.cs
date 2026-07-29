@@ -79,6 +79,21 @@ namespace NSMB.WorldEditor {
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
 
+            // A stage with no star spawn points makes BigStarSystem call
+            // RNG.Next(0, 0), which is a modulo by zero — the sim dies the
+            // instant play begins. The hub has no stars to chase, but the
+            // system still wants somewhere to put them.
+            if (stage.BigStarSpawnpoints == null || stage.BigStarSpawnpoints.Length == 0) {
+                var spots = new Photon.Deterministic.FPVector2[4];
+                for (int i = 0; i < spots.Length; i++) {
+                    spots[i] = new Photon.Deterministic.FPVector2(
+                        Photon.Deterministic.FP.FromFloat_UNSAFE(-6f + i * 4f),
+                        Photon.Deterministic.FP.FromFloat_UNSAFE(-4f));
+                }
+                stage.BigStarSpawnpoints = spots;
+                EditorUtility.SetDirty(stage);
+            }
+
             // Quantum keeps its own asset database keyed by guid. New assets
             // must carry its label and the database must be rebuilt, or the
             // runtime reports "Unable to find asset [guid] (Quantum.Map)".
