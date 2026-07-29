@@ -14,7 +14,8 @@ namespace NSMB.UI.MainMenu.Submenus.Main {
     public class NewsBoardManager : MonoBehaviour {
 
         //---Static Variables
-        private const string URL = "https://mariovsluigi.azurewebsites.net/news";
+        // This deployment serves its own board from its own site.
+        private const string URL = "https://erikgaren.com/api/news";
 
         //---Serialized Variables
         [SerializeField] private NewsBoardEntry template;
