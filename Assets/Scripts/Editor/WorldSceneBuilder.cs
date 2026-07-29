@@ -122,9 +122,15 @@ namespace NSMB.WorldEditor {
             prb.useGravity = false;
             player.AddComponent<WorldMotor>();
             var pctrl = player.AddComponent<WorldPlayerController>();
-            var marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 0.92f);
-            pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
-            Dress(marioVisual, "Assets/Materials/3d/mario/mat_mario_big.mat", "Assets/Materials/3d/mario/mat_mario_eyes.mat");
+            // The game's own gameplay entity prefab — its animator, avatar and
+            // materials already wired the way the Versus mode uses them.
+            var marioVisual = GameBody(player.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerMario.prefab", 0.92f);
+            pctrl.animator = marioVisual ? marioVisual.GetComponentInChildren<Animator>(true) : null;
+            if (!pctrl.animator) {
+                marioVisual = Body(player.transform, "Assets/Models/Players/mario_big/mario_big_exported.fbx", NeonRed, 0.92f);
+                pctrl.animator = WireAnimator(marioVisual, "Assets/Animations/Player/Mario/LargeMario.controller");
+                Dress(marioVisual, "Assets/Materials/3d/mario/mat_mario_big.mat", "Assets/Materials/3d/mario/mat_mario_eyes.mat");
+            }
             var pSpeaker = player.AddComponent<WorldSpeaker>();
             pSpeaker.keyword = "DAVID";
             pSpeaker.bubbleHeight = 1.35f;
@@ -154,9 +160,13 @@ namespace NSMB.WorldEditor {
             npc.AddComponent<WorldMotor>();
             var comp = npc.AddComponent<CompanionNPC>();
             comp.player = player.transform;
-            var luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 0.97f);
-            comp.animator = WireAnimator(luigiVisual, "Assets/Animations/Player/Luigi/LargeLuigi.overrideController");
-            Dress(luigiVisual, "Assets/Materials/3d/luigi/mat_luigi_big.mat", "Assets/Materials/3d/luigi/mat_luigi_eyes.mat");
+            var luigiVisual = GameBody(npc.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerLuigi.prefab", 0.97f);
+            comp.animator = luigiVisual ? luigiVisual.GetComponentInChildren<Animator>(true) : null;
+            if (!comp.animator) {
+                luigiVisual = Body(npc.transform, "Assets/Models/Players/luigi_big/luigi_big.fbx", new Color(0.1f, 0.65f, 0.25f), 0.97f);
+                comp.animator = WireAnimator(luigiVisual, "Assets/Animations/Player/Luigi/LargeLuigi.overrideController");
+                Dress(luigiVisual, "Assets/Materials/3d/luigi/mat_luigi_big.mat", "Assets/Materials/3d/luigi/mat_luigi_eyes.mat");
+            }
             FloatingLabel(npc.transform, "ERIK\n<size=55%>narrator.exe — dev build</size>", 1.75f);
             var nSpeaker = npc.AddComponent<WorldSpeaker>();
             nSpeaker.keyword = "ERIK";
@@ -266,6 +276,72 @@ namespace NSMB.WorldEditor {
                 }
                 r.sharedMaterials = mats;
             }
+        }
+
+        // Instantiates the game's own player entity prefab and strips everything
+        // that needs a running Quantum simulation, keeping the rig: Animator,
+        // avatar, meshes and materials exactly as the Versus mode renders them.
+        private static GameObject GameBody(Transform parent, string prefabPath, float targetHeight) {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (!prefab) {
+                return null;
+            }
+            var visual = (GameObject) PrefabUtility.InstantiatePrefab(prefab);
+            PrefabUtility.UnpackPrefabInstance(visual, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            visual.name = "Visual";
+            visual.transform.SetParent(parent, false);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
+
+            // Quantum views, the gameplay animator driver, colliders, physics.
+            foreach (var mb in visual.GetComponentsInChildren<MonoBehaviour>(true)) {
+                if (mb) {
+                    Object.DestroyImmediate(mb, true);
+                }
+            }
+            foreach (var col in visual.GetComponentsInChildren<Collider>(true)) {
+                Object.DestroyImmediate(col, true);
+            }
+            foreach (var rb in visual.GetComponentsInChildren<Rigidbody>(true)) {
+                Object.DestroyImmediate(rb, true);
+            }
+
+            var animator = visual.GetComponentInChildren<Animator>(true);
+            if (!animator) {
+                Object.DestroyImmediate(visual);
+                return null;
+            }
+            animator.applyRootMotion = false;
+            if (!animator.runtimeAnimatorController) {
+                animator.runtimeAnimatorController =
+                    AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Player/Mario/LargeMario.controller");
+            }
+
+            // The gameplay prefab hides power-up props (shells, helmets) until
+            // the sim enables them; without the sim they would float in place.
+            foreach (var r in visual.GetComponentsInChildren<Renderer>(true)) {
+                string n = r.name.ToLowerInvariant();
+                if (n.Contains("shell") || n.Contains("helmet") || n.Contains("propeller") || n.Contains("goldblock")) {
+                    r.gameObject.SetActive(false);
+                }
+            }
+
+            var renderers = visual.GetComponentsInChildren<Renderer>(false);
+            if (renderers.Length > 0) {
+                Bounds b = renderers[0].bounds;
+                foreach (var r in renderers) {
+                    b.Encapsulate(r.bounds);
+                }
+                if (b.size.y > 0.001f) {
+                    visual.transform.localScale = Vector3.one * (targetHeight / b.size.y);
+                    b = renderers[0].bounds;
+                    foreach (var r in renderers) {
+                        b.Encapsulate(r.bounds);
+                    }
+                    visual.transform.localPosition = new Vector3(0f, parent.position.y - b.min.y + 0.02f, 0f);
+                }
+            }
+            return visual;
         }
 
         private static Animator WireAnimator(GameObject visual, string controllerPath) {
