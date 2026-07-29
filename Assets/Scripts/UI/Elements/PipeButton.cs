@@ -1,4 +1,5 @@
-﻿using NSMB.Utilities.Extensions;
+﻿using NSMB.UI.MainMenu;
+using NSMB.Utilities.Extensions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,6 +22,8 @@ namespace NSMB.UI.Elements {
         private Color disabledColor;
         private Vector2 size;
         private bool hover;
+        private bool wasSelected;
+        private bool freshlyEnabled;
 
         public void OnValidate() {
             this.SetIfNull(ref rect);
@@ -36,6 +39,26 @@ namespace NSMB.UI.Elements {
             hover = false;
         }
 
+        public void OnEnable() {
+            // Opening a menu selects its default button, and that selection is
+            // not the cursor moving — it should not click.
+            freshlyEnabled = true;
+        }
+
+        private bool Interactable => (!button || button.IsInteractable())
+            && (!clickable || clickable.Interactable);
+
+        private void PlayCursorSound() {
+            if (!Interactable) {
+                return;
+            }
+            if (MainMenuCanvas.Instance) {
+                MainMenuCanvas.Instance.PlayCursorSound();
+            } else if (GlobalController.Instance) {
+                GlobalController.Instance.PlaySound(SoundEffect.UI_Cursor);
+            }
+        }
+
         public void Start() {
             size = rect.sizeDelta;
         }
@@ -48,7 +71,16 @@ namespace NSMB.UI.Elements {
                 label.color = Color.gray;
                 return;
             }
-            if (hover || EventSystem.current.currentSelectedGameObject == gameObject) {
+            // The cursor landing on a button is the sound the menu was missing:
+            // moving through it with the keyboard or pad was silent.
+            bool selected = EventSystem.current && EventSystem.current.currentSelectedGameObject == gameObject;
+            if (selected && !wasSelected && !freshlyEnabled) {
+                PlayCursorSound();
+            }
+            wasSelected = selected;
+            freshlyEnabled = false;
+
+            if (hover || selected) {
                 rect.sizeDelta = size;
                 image.color = selectedColor;
                 label.color = Color.yellow;
@@ -60,6 +92,9 @@ namespace NSMB.UI.Elements {
         }
 
         public void OnPointerEnter(PointerEventData eventData) {
+            if (!hover) {
+                PlayCursorSound();
+            }
             hover = true;
         }
 
