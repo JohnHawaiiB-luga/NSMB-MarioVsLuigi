@@ -21,6 +21,7 @@ namespace NSMB.World {
         private string currentScene = "";
         private readonly List<GameObject> siblings = new();
         private readonly List<GameObject> chooser = new();
+        private readonly List<NSMB.Sound.LoopingMusicPlayer> silenced = new();
         private AudioSource music;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -53,6 +54,15 @@ namespace NSMB.World {
                 Destroy(music.gameObject);
                 music = null;
             }
+            // Their player survives into gameplay, and while it is disabled it
+            // cannot honour a track's authored loop points — the song would
+            // just restart at the end of the file.
+            foreach (var player in silenced) {
+                if (player) {
+                    player.enabled = true;
+                }
+            }
+            silenced.Clear();
         }
 
         private IEnumerator Watch() {
@@ -99,6 +109,9 @@ namespace NSMB.World {
                     player.AudioSource.Stop();
                 }
                 player.enabled = false;
+                if (!silenced.Contains(player)) {
+                    silenced.Add(player);
+                }
             }
             if (!music) {
                 var go = new GameObject("WorldMenuMusic");

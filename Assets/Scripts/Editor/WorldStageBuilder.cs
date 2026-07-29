@@ -7,52 +7,80 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.Tilemaps;
 
 namespace NSMB.WorldEditor {
-    // Authors the hub as a real Versus stage, following the same recipe their
-    // own Tools/MvLO/Create New Map window uses: copy the level template, make
-    // a VersusStageData + Map pair, point the scene's QuantumMapData at it, and
-    // register the scene. Saving the scene bakes the Quantum map automatically.
+    // Builds the hub as a real Versus stage by taking one of their finished
+    // levels and making it ours, rather than authoring a stage from nothing.
     //
-    // Without this the hub had no stage of its own, so a local session simply
-    // ran their default Versus map — which is exactly what it looked like.
+    // The first version of this started from LevelTemplate — their deliberately
+    // empty starter — and hand-wrote each field the simulation needed. Every
+    // field it missed was a division by zero at runtime, found one deploy at a
+    // time. A shipped level already carries all of it: painted ground, star
+    // spawns, enemies, coins, backgrounds, camera bounds and music. Copy that
+    // and add to it.
     public static class WorldStageBuilder {
 
         private const string StageName = "WorldHubStage";
         private const string ScenePath = "Assets/Scenes/Levels/" + StageName + ".unity";
         private const string AssetDir = "Assets/QuantumUser/Resources/AssetObjects/Maps/" + StageName;
 
+        // The foundation the hub is remixed from.
+        private const string SourceScene = "Assets/Scenes/Levels/DefaultGrassLevel.unity";
+        private const string SourceStage = "Assets/QuantumUser/Resources/AssetObjects/Maps/Grass/DefaultGrassStageData.asset";
+
+        // Ours, and not to be taken from the level we copied.
+        private static readonly string[] OwnFields = {
+            "m_Script", "m_Name", "Identifier", "TranslationKey",
+            "GroupingTranslationKey", "StageAuthor", "MusicComposer",
+            "DiscordStageImage", "SortOrder",
+        };
+
         [MenuItem("Tools/World/Build Hub Stage")]
         public static void BuildStage() {
+            Build(false);
+        }
+
+        // Throws away hub scene edits and takes the level again from scratch.
+        [MenuItem("Tools/World/Rebuild Hub Stage From Level")]
+        public static void RebuildStage() {
+            Build(true);
+        }
+
+        private static void Build(bool fromScratch) {
             Directory.CreateDirectory(AssetDir);
 
+            if (fromScratch && AssetDatabase.AssetPathExists(ScenePath)) {
+                AssetDatabase.DeleteAsset(ScenePath);
+            }
             if (!AssetDatabase.AssetPathExists(ScenePath)) {
-                if (!AssetDatabase.CopyAsset("Assets/Scenes/LevelTemplate.unity", ScenePath)) {
-                    Debug.LogError("[WorldStageBuilder] could not copy the level template");
+                if (!AssetDatabase.CopyAsset(SourceScene, ScenePath)) {
+                    Debug.LogError($"[WorldStageBuilder] could not copy {SourceScene}");
                     return;
                 }
+                Debug.Log($"[WorldStageBuilder] hub scene taken from {Path.GetFileName(SourceScene)}");
             }
 
             Scene scene = EditorSceneManager.OpenScene(ScenePath);
 
-            // Copy a shipped stage's data rather than creating a blank one: it
-            // carries authored settings the simulation relies on (spawn point,
-            // camera bounds, tile dimensions). A blank asset left those at zero,
-            // which is what killed the run right after the countdown.
+            var reference = AssetDatabase.LoadAssetAtPath<VersusStageData>(SourceStage);
+            if (!reference) {
+                Debug.LogError($"[WorldStageBuilder] could not load {SourceStage}");
+                return;
+            }
+
             string stageAssetPath = AssetDir + "/" + StageName + "Data.asset";
             var stage = AssetDatabase.LoadAssetAtPath<VersusStageData>(stageAssetPath);
             if (!stage) {
-                const string reference = "Assets/QuantumUser/Resources/AssetObjects/Maps/Grass/DefaultGrassStageData.asset";
-                if (!AssetDatabase.CopyAsset(reference, stageAssetPath)) {
-                    Debug.LogError("[WorldStageBuilder] could not copy the reference stage data");
-                    return;
-                }
-                AssetDatabase.ImportAsset(stageAssetPath);
-                stage = AssetDatabase.LoadAssetAtPath<VersusStageData>(stageAssetPath);
-                stage.TranslationKey = "levels.custom.worldhub";
-                EditorUtility.SetDirty(stage);
+                stage = ScriptableObject.CreateInstance<VersusStageData>();
+                AssetDatabase.CreateAsset(stage, stageAssetPath);
             }
+
+            // Everything the level's own stage data says about how it plays —
+            // music, spawn point and area, camera bounds, UI colour, sound
+            // overrides. Copied wholesale so nothing has to be remembered.
+            Inherit(reference, stage);
+            Identify(stage);
+            EditorUtility.SetDirty(stage);
 
             string mapAssetPath = AssetDir + "/" + StageName + "Map.asset";
             var map = AssetDatabase.LoadAssetAtPath<Map>(mapAssetPath);
@@ -67,23 +95,22 @@ namespace NSMB.WorldEditor {
 
             var holder = UnityEngine.Object.FindFirstObjectByType<QuantumMapData>();
             if (!holder) {
-                Debug.LogError("[WorldStageBuilder] the template has no QuantumMapData");
+                Debug.LogError("[WorldStageBuilder] the scene has no QuantumMapData");
                 return;
             }
             holder.AssetRef = map;
             EditorUtility.SetDirty(holder);
 
-            PaintHub();
             RegisterScene();
 
+            // Saving runs their VersusStageBaker, which owns the tilemap, the
+            // camera bounds and the star spawns — it reads the last of those
+            // from the StarSpawn markers already standing in the level.
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
 
-            // Saving the scene runs VersusStageBaker, which owns the tilemap
-            // and camera fields. Everything below is what it does not touch, so
-            // it has to be written after the bake and on every run.
-            Configure(stage);
+            Backstop(reference, stage);
             EditorUtility.SetDirty(stage);
 
             // Quantum keeps its own asset database keyed by guid. New assets
@@ -102,40 +129,44 @@ namespace NSMB.WorldEditor {
             Debug.Log($"[WorldStageBuilder] hub stage ready. Map guid: {map.Guid.Value}");
         }
 
-        // Their simulation reads these without guarding, so an empty list or a
-        // zero here is a division by zero the moment gameplay starts. The hub
-        // died on exactly that twice: no star spawn points, then no music.
-        private static void Configure(VersusStageData stage) {
-            stage.TranslationKey = "levels.custom.worldhub";
-            stage.StageAuthor = "David Erik García Arenas";
-            stage.MusicComposer = "Nintendo";
+        // Copy the level's play settings across, leaving our identity and the
+        // asset's own guid alone — sharing a guid would collide in Quantum's
+        // database.
+        private static void Inherit(VersusStageData from, VersusStageData to) {
+            var src = new SerializedObject(from);
+            var dst = new SerializedObject(to);
 
-            // The hub runs the game's own main menu theme; world.ogg stays on
-            // the site's menu, where it belongs.
-            stage.MainMusic = new[] { Music("MusicMainMenu") };
-            stage.InvincibleMusic = Music("MusicStarman");
-            stage.MegaMushroomMusic = Music("MusicMegaMushroom");
-
-            // The plaza floor is two tile rows at y -12..-11, so its surface is
-            // world y -5. Spawn just above it, centred.
-            stage.Spawnpoint = new FPVector2(0, FP.FromFloat_UNSAFE(-3.5f));
-            stage.SpawnpointArea = new FPVector2(FP.FromFloat_UNSAFE(1.4f), FP.FromFloat_UNSAFE(0.8f));
-
-            var spots = new FPVector2[4];
-            for (int i = 0; i < spots.Length; i++) {
-                spots[i] = new FPVector2(FP.FromFloat_UNSAFE(-12f + i * 8f), FP.FromFloat_UNSAFE(-4f));
+            var it = src.GetIterator();
+            if (it.NextVisible(true)) {
+                do {
+                    if (Array.IndexOf(OwnFields, it.propertyPath) >= 0) {
+                        continue;
+                    }
+                    dst.CopyFromSerializedProperty(it);
+                } while (it.NextVisible(false));
             }
-            stage.BigStarSpawnpoints = spots;
+            dst.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static AssetRef<LoopingMusicData> Music(string name) {
-            var asset = Load<LoopingMusicData>(
-                "Assets/QuantumUser/Resources/AssetObjects/Music/" + name + ".asset");
-            if (!asset) {
-                Debug.LogError($"[WorldStageBuilder] music asset {name} is missing");
-                return default;
+        private static void Identify(VersusStageData stage) {
+            stage.TranslationKey = "levels.custom.worldhub";
+            stage.GroupingTranslationKey = "";
+            stage.StageAuthor = "David Erik García Arenas";
+            stage.MusicComposer = "Nintendo";
+        }
+
+        // The bake should have filled these from the level. If it ever does
+        // not, fall back to the level's own values rather than let the
+        // simulation divide by an empty array.
+        private static void Backstop(VersusStageData reference, VersusStageData stage) {
+            if (stage.MainMusic == null || stage.MainMusic.Length == 0) {
+                Debug.LogWarning("[WorldStageBuilder] no music after bake — taking the level's");
+                stage.MainMusic = reference.MainMusic;
             }
-            return new AssetRef<LoopingMusicData>(asset.Guid);
+            if (stage.BigStarSpawnpoints == null || stage.BigStarSpawnpoints.Length == 0) {
+                Debug.LogWarning("[WorldStageBuilder] no star spawns after bake — taking the level's");
+                stage.BigStarSpawnpoints = reference.BigStarSpawnpoints;
+            }
         }
 
         // A bad stage used to surface as "remainder by zero" in the browser,
@@ -151,7 +182,8 @@ namespace NSMB.WorldEditor {
 
             Require(stage.MainMusic != null && stage.MainMusic.Length > 0, "no main music: VersusStageData.GetCurrentMusic divides by MainMusic.Length");
             Require(stage.MainMusic == null || Array.TrueForAll(stage.MainMusic, m => m.Id.IsValid), "a main music entry is an invalid asset reference");
-            Require(stage.BigStarSpawnpoints != null && stage.BigStarSpawnpoints.Length > 0, "no star spawn points: BigStarSystem divides by their count");
+            Require(stage.BigStarSpawnpoints != null && stage.BigStarSpawnpoints.Length > 0, "no star spawns: BigStarSystem divides by their count");
+            Require(stage.Spawnpoint != FPVector2.Zero, "the player spawn point is at the origin — the level's was not inherited");
             Require(stage.TileDimensions.X > 0 && stage.TileDimensions.Y > 0, $"tile dimensions are {stage.TileDimensions} — the bake did not run");
             Require(stage.TileData != null && stage.TileData.Length == stage.TileDimensions.X * stage.TileDimensions.Y,
                 $"tile data is {(stage.TileData == null ? 0 : stage.TileData.Length)} entries, expected {stage.TileDimensions.X * stage.TileDimensions.Y}");
@@ -161,75 +193,6 @@ namespace NSMB.WorldEditor {
                     + $"{stage.MainMusic.Length} track(s), {stage.BigStarSpawnpoints.Length} star spawn(s), spawn at {stage.Spawnpoint}");
             }
             return ok;
-        }
-
-        // A wide, safe plaza with a few things to jump on — their tiles, their
-        // grid, so the simulation treats it exactly like any Versus stage.
-        private static void PaintHub() {
-            var ground = FindTilemap("Tilemap_Ground") ?? FindTilemap("Tilemap");
-            if (!ground) {
-                Debug.LogError("[WorldStageBuilder] no ground tilemap in the template");
-                return;
-            }
-
-            var grass = Load<TileBase>("Assets/Resources/Tilemaps/Tiles/Grass/GrassGround.asset");
-            var semisolid = Load<TileBase>("Assets/Resources/Tilemaps/Tiles/Grass/BrownSemisolid.asset");
-            var wood = Load<TileBase>("Assets/Resources/Tilemaps/Tiles/Grass/WoodBlock.asset");
-            if (!grass) {
-                Debug.LogError("[WorldStageBuilder] grass tile missing");
-                return;
-            }
-
-            ground.ClearAllTiles();
-
-            // Floor across the whole stage width, two rows thick.
-            for (int x = -32; x <= 31; x++) {
-                for (int y = -12; y <= -11; y++) {
-                    ground.SetTile(new Vector3Int(x, y, 0), grass);
-                }
-            }
-
-            // Steps up on the left, a plateau on the right.
-            for (int s = 0; s < 4; s++) {
-                for (int x = -26 + s * 3; x < -23 + s * 3; x++) {
-                    ground.SetTile(new Vector3Int(x, -10 + s, 0), grass);
-                }
-            }
-            for (int x = 14; x <= 26; x++) {
-                ground.SetTile(new Vector3Int(x, -7, 0), grass);
-            }
-
-            // Floating semisolid platforms to hop between.
-            if (semisolid) {
-                foreach (int[] p in new[] { new[] { -8, -7 }, new[] { -2, -5 }, new[] { 4, -3 }, new[] { 10, -5 } }) {
-                    for (int x = p[0]; x < p[0] + 4; x++) {
-                        ground.SetTile(new Vector3Int(x, p[1], 0), semisolid);
-                    }
-                }
-            }
-
-            // A couple of blocks to bonk.
-            if (wood) {
-                foreach (int x in new[] { -14, -12, 0, 2, 18 }) {
-                    ground.SetTile(new Vector3Int(x, -8, 0), wood);
-                }
-            }
-
-            ground.CompressBounds();
-            EditorUtility.SetDirty(ground);
-        }
-
-        private static Tilemap FindTilemap(string name) {
-            foreach (var tm in UnityEngine.Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
-                if (tm.name == name) {
-                    return tm;
-                }
-            }
-            return null;
-        }
-
-        private static T Load<T>(string path) where T : UnityEngine.Object {
-            return AssetDatabase.LoadAssetAtPath<T>(path);
         }
 
         private static void RegisterScene() {
