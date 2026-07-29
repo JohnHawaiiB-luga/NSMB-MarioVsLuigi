@@ -137,7 +137,7 @@ namespace NSMB.WorldEditor {
             prb.useGravity = false;
             player.AddComponent<WorldMotor>();
             var pctrl = player.AddComponent<WorldPlayerController>();
-            var marioVisual = GameBody(player.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerMario.prefab", 0.92f);
+            var marioVisual = GameBody(player.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerMario.prefab", 0.92f, "Assets/Animations/Player/Mario/LargeMario.controller");
             pctrl.animator = marioVisual ? marioVisual.GetComponentInChildren<Animator>(true) : null;
             var pSpeaker = player.AddComponent<WorldSpeaker>();
             pSpeaker.keyword = "DAVID";
@@ -181,7 +181,7 @@ namespace NSMB.WorldEditor {
             npc.AddComponent<WorldMotor>();
             var comp = npc.AddComponent<CompanionNPC>();
             comp.player = player.transform;
-            var luigiVisual = GameBody(npc.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerLuigi.prefab", 0.97f);
+            var luigiVisual = GameBody(npc.transform, "Assets/QuantumUser/Resources/EntityPrototypes/Player/PlayerLuigi.prefab", 0.97f, "Assets/Animations/Player/Luigi/LargeLuigi.overrideController");
             comp.animator = luigiVisual ? luigiVisual.GetComponentInChildren<Animator>(true) : null;
             var nSpeaker = npc.AddComponent<WorldSpeaker>();
             nSpeaker.keyword = "ERIK";
@@ -418,7 +418,7 @@ namespace NSMB.WorldEditor {
 
         // --------------------------------------------------------------- bodies
 
-        private static GameObject GameBody(Transform parent, string prefabPath, float targetHeight) {
+        private static GameObject GameBody(Transform parent, string prefabPath, float targetHeight, string controllerPath) {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             if (!prefab) {
                 return null;
@@ -448,6 +448,15 @@ namespace NSMB.WorldEditor {
                 return null;
             }
             animator.applyRootMotion = false;
+            // The gameplay prefab leaves the controller to the sim's animator
+            // driver, so without this the body just stands in its bind pose —
+            // which is exactly how Luigi ended up frozen while walking around.
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(controllerPath);
+            if (controller) {
+                animator.runtimeAnimatorController = controller;
+            }
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            animator.updateMode = AnimatorUpdateMode.Normal;
 
             foreach (var r in visual.GetComponentsInChildren<Renderer>(true)) {
                 string n = r.name.ToLowerInvariant();

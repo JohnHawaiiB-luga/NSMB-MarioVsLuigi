@@ -30,13 +30,25 @@ namespace NSMB.World {
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
-            StopAllCoroutines();
             siblings.Clear();
             chooser.Clear();
             versusAction = null;
             anchor = null;
             if (scene.name == "MainMenu") {
                 StartCoroutine(Watch());
+            } else {
+                // The menu theme must not follow the player into a match or the
+                // hub — both bring their own.
+                StopAllCoroutines();
+                StopMusic();
+            }
+        }
+
+        private void StopMusic() {
+            if (music) {
+                music.Stop();
+                Destroy(music.gameObject);
+                music = null;
             }
         }
 
@@ -96,8 +108,12 @@ namespace NSMB.World {
 
             anchor = play.GetComponent<RectTransform>();
             siblings.Clear();
+            // Only their buttons hide behind the fork — the News Board shares
+            // this parent, and hiding it blanked the board.
             foreach (Transform child in play.transform.parent) {
-                siblings.Add(child.gameObject);
+                if (child.name.StartsWith("Btn")) {
+                    siblings.Add(child.gameObject);
+                }
             }
 
             versusAction = play.onClick;
@@ -105,13 +121,12 @@ namespace NSMB.World {
             play.onClick.AddListener(ShowChooser);
 
             chooser.Add(Clone(play, "World Hub", new Color(0.55f, 0.18f, 0.85f), () => {
-                if (music) {
-                    music.Stop();
-                }
-                SceneManager.LoadScene("WorldHub");
+                StopMusic();
+                StartCoroutine(WorldTransition.ToScene("WorldHub"));
             }));
             chooser.Add(Clone(play, "Versus", new Color(0.13f, 0.42f, 0.85f), () => {
                 Restore();
+                StopMusic();
                 versusAction?.Invoke();
             }));
             chooser.Add(Clone(play, "Back", new Color(0.35f, 0.35f, 0.4f), Restore));
@@ -122,13 +137,11 @@ namespace NSMB.World {
             var clone = Instantiate(source.gameObject, source.transform.parent);
             clone.name = "World_" + label.Replace(" ", "");
 
-            // Strip upstream logic (translation drivers would overwrite the
-            // label, submenu handlers would open their menus) and keep visuals.
+            // Keep their components — that is what gives the clone its cursor
+            // and confirm sounds. Only the translation driver goes, since it
+            // would overwrite the label on the next language event.
             foreach (var mb in clone.GetComponentsInChildren<MonoBehaviour>(true)) {
-                bool keep = mb is Button || mb is Image || mb is TMP_Text
-                    || mb is LayoutElement || mb is LayoutGroup || mb is ContentSizeFitter
-                    || mb is Mask || mb is RectMask2D || mb is Shadow || mb is Outline;
-                if (!keep) {
+                if (mb && mb.GetType().Name.Contains("Translat")) {
                     Destroy(mb);
                 }
             }
@@ -165,7 +178,6 @@ namespace NSMB.World {
                     var rt = chooser[i].GetComponent<RectTransform>();
                     rt.anchoredPosition = anchor.anchoredPosition + new Vector2(0f, -step * i);
                 }
-                chooser[i].transform.SetSiblingIndex(i);
             }
             if (chooser.Count > 0 && chooser[0] && UnityEngine.EventSystems.EventSystem.current) {
                 UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(chooser[0]);
