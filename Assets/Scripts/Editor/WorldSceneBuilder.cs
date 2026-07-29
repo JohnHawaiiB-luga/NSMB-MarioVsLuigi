@@ -27,51 +27,10 @@ namespace NSMB.WorldEditor {
         [MenuItem("Tools/World/Build Scenes")]
         public static void BuildScenes() {
             GameFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Resources/Fonts/BoldFont.asset");
-            BuildEntryScene();
             BuildHubScene();
             RegisterScenes();
             AssetDatabase.SaveAssets();
-            Debug.Log("[WorldSceneBuilder] WorldEntry + WorldHub built and registered.");
-        }
-
-        // ------------------------------------------------------------------ entry
-
-        private static void BuildEntryScene() {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
-            var camGo = new GameObject("Camera");
-            var cam = camGo.AddComponent<Camera>();
-            cam.tag = "MainCamera";
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Night;
-
-            var esGo = new GameObject("EventSystem");
-            esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            esGo.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-
-            var canvasGo = new GameObject("Canvas");
-            var canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvasGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            canvasGo.AddComponent<GraphicRaycaster>();
-            canvasGo.AddComponent<WorldEntryMenu>();
-
-            MakeUguiText(canvasGo.transform, "Eyebrow", "erikgaren.com presents", 26,
-                new Vector2(0, 260), new Vector2(1200, 40), new Color(1, 1, 1, 0.55f));
-            MakeUguiText(canvasGo.transform, "Title", "JOHN HAWAII B. LUGA'S WORLD", 72,
-                new Vector2(0, 190), new Vector2(1600, 90), Color.white);
-            MakeUguiText(canvasGo.transform, "Subtitle", "an explorable portfolio — dev build", 28,
-                new Vector2(0, 120), new Vector2(1200, 40), new Color(1, 1, 1, 0.65f));
-
-            MakeButton(canvasGo.transform, "EnterButton", "ENTER THE WORLD", new Vector2(0, -30), NeonRed);
-            MakeButton(canvasGo.transform, "VersusButton", "VERSUS — the classic", new Vector2(0, -140), new Color(0.16f, 0.16f, 0.19f));
-
-            MakeUguiText(canvasGo.transform, "Credit", "world under construction · versus mode is NSMB-MarioVsLuigi by ipodtouch0218 & contributors, used with permission", 18,
-                new Vector2(0, -420), new Vector2(1700, 30), new Color(1, 1, 1, 0.4f));
-
-            EditorSceneManager.SaveScene(scene, "Assets/Scenes/WorldEntry.unity");
+            Debug.Log("[WorldSceneBuilder] WorldHub built and registered; the game's own menu is the front door.");
         }
 
         // -------------------------------------------------------------------- hub
@@ -221,7 +180,7 @@ namespace NSMB.WorldEditor {
             // Doors: warp pipes on the connectors between stages.
             Portal("Door-HawaiiOS", new Vector3(2.4f, 0, sectionStarts[1] - 5f), NeonBlue, "HawaiiOS\n<size=55%>his operating system — press E</size>", null, "https://erikgaren.com/os");
             Portal("Door-Portfolio", new Vector3(-2.4f, 0, sectionStarts[2] - 5f), NeonCyan, "THE CV\n<size=55%>recruiter door — press E</size>", null, "https://erikgaren.com/");
-            Portal("Door-Versus", new Vector3(0f, 0, worldEnd - 3f), NeonRed, "THE ARCADE\n<size=55%>versus — the classic, press E</size>", "Intro", null);
+            Portal("Door-Versus", new Vector3(0f, 0, worldEnd - 3f), NeonRed, "THE ARCADE\n<size=55%>versus — the classic, press E</size>", "MainMenu", null);
 
             // Dev-room fun facts floating around.
             DevFact(new Vector3(-2.4f, 2.2f, sectionStarts[0] + 12f), "// TODO: replace placeholder plumbers\n// legal says hi");
@@ -638,7 +597,6 @@ namespace NSMB.WorldEditor {
         private static void RegisterScenes() {
             var scenes = EditorBuildSettings.scenes.ToList();
             scenes.RemoveAll(s => s.path.Contains("WorldEntry") || s.path.Contains("WorldHub"));
-            scenes.Insert(0, new EditorBuildSettingsScene("Assets/Scenes/WorldEntry.unity", true));
             scenes.Add(new EditorBuildSettingsScene("Assets/Scenes/WorldHub.unity", true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }

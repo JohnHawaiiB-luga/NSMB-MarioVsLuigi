@@ -20,7 +20,7 @@ namespace NSMB {
         }
 
         private static void Notify(Scene scene) {
-            bool gameplay = scene.name != "Intro" && scene.name != "MainMenu" && scene.name != "WorldEntry";
+            bool gameplay = scene.name != "Intro" && scene.name != "MainMenu";
             WorldSetGameplay(gameplay ? 1 : 0);
         }
     }
