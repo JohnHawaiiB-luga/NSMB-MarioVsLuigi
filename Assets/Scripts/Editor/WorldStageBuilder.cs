@@ -1,4 +1,5 @@
 using Quantum;
+using Quantum.Editor;
 using System;
 using System.IO;
 using UnityEditor;
@@ -34,13 +35,22 @@ namespace NSMB.WorldEditor {
 
             Scene scene = EditorSceneManager.OpenScene(ScenePath);
 
+            // Copy a shipped stage's data rather than creating a blank one: it
+            // carries authored settings the simulation relies on (spawn point,
+            // camera bounds, tile dimensions). A blank asset left those at zero,
+            // which is what killed the run right after the countdown.
             string stageAssetPath = AssetDir + "/" + StageName + "Data.asset";
             var stage = AssetDatabase.LoadAssetAtPath<VersusStageData>(stageAssetPath);
             if (!stage) {
-                stage = ScriptableObject.CreateInstance<VersusStageData>();
-                stage.name = StageName;
+                const string reference = "Assets/QuantumUser/Resources/AssetObjects/Maps/Grass/DefaultGrassStageData.asset";
+                if (!AssetDatabase.CopyAsset(reference, stageAssetPath)) {
+                    Debug.LogError("[WorldStageBuilder] could not copy the reference stage data");
+                    return;
+                }
+                AssetDatabase.ImportAsset(stageAssetPath);
+                stage = AssetDatabase.LoadAssetAtPath<VersusStageData>(stageAssetPath);
                 stage.TranslationKey = "levels.custom.worldhub";
-                AssetDatabase.CreateAsset(stage, stageAssetPath);
+                EditorUtility.SetDirty(stage);
             }
 
             string mapAssetPath = AssetDir + "/" + StageName + "Map.asset";
@@ -68,6 +78,16 @@ namespace NSMB.WorldEditor {
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
+
+            // Quantum keeps its own asset database keyed by guid. New assets
+            // must carry its label and the database must be rebuilt, or the
+            // runtime reports "Unable to find asset [guid] (Quantum.Map)".
+            AssetDatabase.SetLabels(stage, new[] { QuantumUnityDBUtilities.AssetLabel });
+            AssetDatabase.SetLabels(map, new[] { QuantumUnityDBUtilities.AssetLabel });
+            AssetDatabase.SaveAssets();
+            QuantumUnityDBUtilities.RefreshGlobalDB(true);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
 
             Debug.Log($"[WorldStageBuilder] hub stage ready. Map guid: {map.Guid.Value}");
         }

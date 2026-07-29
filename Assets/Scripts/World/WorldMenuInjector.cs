@@ -57,6 +57,9 @@ namespace NSMB.World {
 
         private IEnumerator Watch() {
             var wait = new WaitForSeconds(0.4f);
+            // The theme starts immediately, so the game's own track never gets
+            // a moment on the title screen before ours takes over.
+            SwapMusic();
             while (true) {
                 bool inMenu = FindPlayButton();
                 if (inMenu) {
@@ -64,7 +67,7 @@ namespace NSMB.World {
                         TryInject();
                     }
                     SwapMusic();
-                } else if (music || chooser.Count > 0) {
+                } else if (chooser.Count > 0) {
                     // The menu is gone: drop the theme and forget the buttons,
                     // so the next visit rebuilds cleanly.
                     StopMusic();
@@ -145,7 +148,9 @@ namespace NSMB.World {
             chooser.Add(Clone(play, "Versus", new Color(0.13f, 0.42f, 0.85f), () => {
                 Restore();
                 StopMusic();
-                versusAction?.Invoke();
+                // Hand the original event back to the button and fire it there:
+                // invoking a detached UnityEvent did nothing, so Versus was dead.
+                StartCoroutine(FireVersus(play));
             }));
             chooser.Add(Clone(play, "Back", new Color(0.35f, 0.35f, 0.4f), Restore));
             Debug.Log("[World] menu fork installed on BtnPlay");
@@ -182,15 +187,60 @@ namespace NSMB.World {
             return clone;
         }
 
+        // The board stays put; its posts step aside for a note explaining the
+        // two modes, and come back when the fork closes.
+        private void ShowModeBlurb(bool show) {
+            if (!newsBoard) {
+                return;
+            }
+            foreach (Transform child in newsBoard.transform) {
+                if (child.name != "WorldModeBlurb") {
+                    child.gameObject.SetActive(!show);
+                }
+            }
+
+            var existing = newsBoard.transform.Find("WorldModeBlurb");
+            if (!show) {
+                if (existing) {
+                    existing.gameObject.SetActive(false);
+                }
+                return;
+            }
+
+            if (!existing) {
+                var go = new GameObject("WorldModeBlurb");
+                go.transform.SetParent(newsBoard.transform, false);
+                var tmp = go.AddComponent<TextMeshProUGUI>();
+                tmp.fontSize = 25f;
+                tmp.alignment = TextAlignmentOptions.TopLeft;
+                tmp.color = Color.white;
+                tmp.text =
+                    "<size=130%>WORLD HUB</size>\n" +
+                    "The walkable half of erikgaren.com — my own stage running this game's " +
+                    "engine. No timer, no lives, nothing to chase: wander, and take a pipe " +
+                    "to the site or to HawaiiOS.\n\n" +
+                    "<size=130%>VERSUS</size>\n" +
+                    "The classic mode, untouched — real online multiplayer on my own server. " +
+                    "Create a room or join one by ID, two to ten players. Bring a friend.\n\n" +
+                    "<size=130%>BACK</size>\n" +
+                    "Return to the news board.";
+                var rt = tmp.rectTransform;
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = new Vector2(36f, 36f);
+                rt.offsetMax = new Vector2(-36f, -80f);
+                existing = go.transform;
+            }
+            existing.gameObject.SetActive(true);
+        }
+
         private void ShowChooser() {
             foreach (var go in siblings) {
                 if (go) {
                     go.SetActive(false);
                 }
             }
-            if (newsBoard) {
-                newsBoard.SetActive(false);
-            }
+            ShowModeBlurb(true);
             bool laidOut = anchor && anchor.parent && anchor.parent.GetComponent<LayoutGroup>();
             float step = anchor ? anchor.rect.height + 14f : 90f;
             for (int i = 0; i < chooser.Count; i++) {
@@ -208,6 +258,19 @@ namespace NSMB.World {
             }
         }
 
+        private IEnumerator FireVersus(Button play) {
+            if (!play || versusAction == null) {
+                yield break;
+            }
+            var mine = play.onClick;
+            play.onClick = versusAction;
+            play.onClick.Invoke();
+            yield return null;
+            if (play) {
+                play.onClick = mine;
+            }
+        }
+
         private void Restore() {
             foreach (var go in chooser) {
                 if (go) {
@@ -219,9 +282,7 @@ namespace NSMB.World {
                     go.SetActive(true);
                 }
             }
-            if (newsBoard) {
-                newsBoard.SetActive(true);
-            }
+            ShowModeBlurb(false);
         }
     }
 }
