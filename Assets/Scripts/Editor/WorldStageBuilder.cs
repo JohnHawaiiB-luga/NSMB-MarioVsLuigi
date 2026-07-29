@@ -229,9 +229,22 @@ namespace NSMB.WorldEditor {
                         hubMap.SetTransformMatrix(target, srcMap.GetTransformMatrix(cell));
                     }
 
+                    // Bridge the seam by copying the profile of the ground
+                    // immediately before it. A single row at the very bottom
+                    // sat underneath the ground either side of it and read as
+                    // a bottomless pit between every pair of stages.
                     if (bridge) {
+                        int sample = cursor - Gap - 1;
+                        int top = baseY;
+                        for (int y = baseY; y < baseY + 12; y++) {
+                            if (hubMap.GetTile(new Vector3Int(sample, y, 0))) {
+                                top = y;
+                            }
+                        }
                         for (int x = cursor - Gap; x < cursor; x++) {
-                            hubMap.SetTile(new Vector3Int(x, baseY, 0), bridge);
+                            for (int y = baseY; y <= top; y++) {
+                                hubMap.SetTile(new Vector3Int(x, y, 0), bridge);
+                            }
                         }
                     }
 
@@ -325,15 +338,15 @@ namespace NSMB.WorldEditor {
             luigi.name = "Luigi";
             luigi.transform.position = spawn + new Vector3(-2f, 0f, 0f);
 
-            // He is scenery, not a player: everything that would have the
-            // simulation try to drive him has to come off, or he will look for
-            // an entity that was never created for him.
+            // He is scenery, not a player. Every script comes off — all of them
+            // belong to a player that the simulation drives, and any one left
+            // behind hunts for an entity that was never created and throws on
+            // every frame. Stripping by name missed WrappingEntityView, which
+            // is exactly that: a Quantum entity view not called Quantum
+            // anything. The model, its animator and its renderers are not
+            // MonoBehaviours and stay.
             foreach (var mb in luigi.GetComponentsInChildren<MonoBehaviour>(true)) {
-                if (!mb) {
-                    continue;
-                }
-                string type = mb.GetType().Name;
-                if (type.StartsWith("Quantum") || type.StartsWith("QPrototype") || type == "MarioPlayerAnimator") {
+                if (mb) {
                     UnityEngine.Object.DestroyImmediate(mb, true);
                 }
             }

@@ -196,25 +196,37 @@ namespace NSMB.World {
                 && UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject == worldButton.gameObject;
 
             if (show && !blurb) {
+                // The menu rebuilds its objects on every visit, so a blurb from
+                // last time is still sitting on the board — build a second and
+                // they stack, one more each visit.
+                var existing = newsBoard.transform.Find("WorldModeBlurb");
+                blurb = existing ? existing.gameObject : null;
+            }
+
+            if (show && !blurb) {
                 var go = new GameObject("WorldModeBlurb");
                 go.transform.SetParent(newsBoard.transform, false);
                 var tmp = go.AddComponent<TextMeshProUGUI>();
-                tmp.fontSize = 25f;
                 tmp.alignment = TextAlignmentOptions.TopLeft;
                 tmp.color = Color.white;
+                // Their board is not much taller than a paragraph; let the text
+                // find a size that fits rather than run off the bottom and over
+                // the version line.
+                tmp.enableAutoSizing = true;
+                tmp.fontSizeMin = 8f;
+                tmp.fontSizeMax = 22f;
+                tmp.overflowMode = TextOverflowModes.Truncate;
                 tmp.text =
-                    "<size=130%>WORLD HUB</size>\n" +
-                    "The walkable half of erikgaren.com — my own stage running this game's " +
-                    "engine. No timer, no lives, nothing to chase: wander, read the signs, " +
-                    "and take a pipe back to the site or to HawaiiOS.\n\n" +
-                    "<size=130%>PLAY GAME</size>\n" +
-                    "The classic mode, untouched — real online multiplayer on my own server. " +
-                    "Create a room or join one by ID, two to ten players. Bring a friend.";
+                    "<b>WORLD HUB</b>\n" +
+                    "The walkable half of erikgaren.com — my own stage on this game's " +
+                    "engine. No timer, nothing to chase: wander and read the signs.\n\n" +
+                    "<b>PLAY GAME</b>\n" +
+                    "The classic mode, untouched — online multiplayer on my own server.";
                 var rt = tmp.rectTransform;
                 rt.anchorMin = Vector2.zero;
                 rt.anchorMax = Vector2.one;
-                rt.offsetMin = new Vector2(36f, 36f);
-                rt.offsetMax = new Vector2(-36f, -80f);
+                rt.offsetMin = new Vector2(28f, 28f);
+                rt.offsetMax = new Vector2(-28f, -72f);
                 blurb = go;
             }
 

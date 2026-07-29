@@ -31,6 +31,13 @@ namespace NSMB.World {
         private void Update() {
             fps = Mathf.Lerp(fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 0.0001f), 0.1f);
 
+            // The host outlives scene changes, so without this the panel — and
+            // its keys — follow you back out to the main menu.
+            if (!WorldLocalGame.Running) {
+                shown = false;
+                return;
+            }
+
             var keyboard = Keyboard.current;
             if (keyboard == null) {
                 return;
@@ -60,9 +67,15 @@ namespace NSMB.World {
             // Nothing at all until it is asked for. An always-on hint sat over
             // the game's own HUD, and an OnGUI rect eats touches wherever it
             // is drawn — a debug panel has no business taking the controls.
-            if (!shown) {
+            if (!shown || !WorldLocalGame.Running) {
                 return;
             }
+
+            // OnGUI works in raw pixels, so on a 4K screen the panel comes out
+            // a quarter of the size it was drawn at and unreadable.
+            Matrix4x4 restore = GUI.matrix;
+            float scale = Mathf.Max(1f, Screen.height / 1080f);
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * scale);
 
             var camera = FindFirstObjectByType<CameraAnimator>();
             Transform mario = null;
@@ -74,8 +87,9 @@ namespace NSMB.World {
             }
 
             // Right-hand side, clear of their coin and star counters and of the
-            // page's thumb controls along the bottom.
-            float x = Screen.width - 338;
+            // page's thumb controls along the bottom. In scaled space, so the
+            // screen width has to come back through the same scale.
+            float x = (Screen.width / scale) - 338;
             GUI.Box(new Rect(x, 8, 330, 190), "JOHN HAWAII B. LUGA'S WORLD — DEBUG");
             int row = 0;
             void Line(string label, string value) {
@@ -98,6 +112,8 @@ namespace NSMB.World {
                 Time.timeScale > 0.9f ? "slow motion" : "normal speed")) {
                 Time.timeScale = Time.timeScale > 0.9f ? 0.35f : 1f;
             }
+
+            GUI.matrix = restore;
         }
     }
 }
