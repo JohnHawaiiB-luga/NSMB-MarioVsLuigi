@@ -138,6 +138,21 @@ namespace NSMB.WorldEditor {
             pSpeaker.keyword = "DAVID";
             pSpeaker.bubbleHeight = 1.35f;
 
+            // The game's own player sounds.
+            var pSfx = player.AddComponent<AudioSource>();
+            pSfx.playOnAwake = false;
+            pSfx.spatialBlend = 0f;
+            pctrl.sfx = pSfx;
+            pctrl.jumpClip = Clip("Assets/Sound/player/jump.ogg");
+            pctrl.crouchClip = Clip("Assets/Sound/player/crouch.ogg");
+            pctrl.skidClip = Clip("Assets/Sound/player/slide.ogg");
+            pctrl.groundpoundStart = Clip("Assets/Sound/player/groundpound_start.ogg");
+            pctrl.groundpoundLand = Clip("Assets/Sound/player/groundpound_landing.ogg");
+            pctrl.footsteps = new[] {
+                Clip("Assets/Sound/player/walk/grass_1.ogg"),
+                Clip("Assets/Sound/player/walk/grass_2.ogg"),
+            };
+
             var camGo = new GameObject("Camera");
             var cam = camGo.AddComponent<Camera>();
             cam.tag = "MainCamera";
@@ -177,6 +192,7 @@ namespace NSMB.WorldEditor {
 
             // Speech bubbles with the game's font and its chat SFX.
             BuildBubble();
+            BuildControlsCard();
 
             // Story beats at each stage section — a conversation between the two
             // of them, placeholder bodies acknowledged in-fiction.
@@ -607,6 +623,42 @@ namespace NSMB.WorldEditor {
             } finally {
                 EditorSceneManager.CloseScene(level, true);
             }
+        }
+
+        private static AudioClip Clip(string path) {
+            return AssetDatabase.LoadAssetAtPath<AudioClip>(path);
+        }
+
+        // Corner card telling the visitor what they can do.
+        private static void BuildControlsCard() {
+            var canvasGo = new GameObject("ControlsCanvas");
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+
+            var panel = new GameObject("Panel");
+            panel.transform.SetParent(canvasGo.transform, false);
+            var img = panel.AddComponent<Image>();
+            img.color = new Color(0f, 0f, 0f, 0.55f);
+            var prt = panel.GetComponent<RectTransform>();
+            prt.anchorMin = new Vector2(0f, 1f);
+            prt.anchorMax = new Vector2(0f, 1f);
+            prt.pivot = new Vector2(0f, 1f);
+            prt.anchoredPosition = new Vector2(28f, -28f);
+            prt.sizeDelta = new Vector2(430f, 214f);
+
+            var text = MakeUguiText(panel.transform, "Controls",
+                "MOVE   WASD / arrows\n" +
+                "RUN    hold Shift\n" +
+                "JUMP   Space  (again on landing: double, triple)\n" +
+                "CROUCH hold S\n" +
+                "POUND  S in mid-air\n" +
+                "TALK / ENTER PIPE   E\n" +
+                "BACK TO MENU   Esc",
+                21, Vector2.zero, new Vector2(400f, 190f), Color.white);
+            text.alignment = TextAlignmentOptions.TopLeft;
         }
 
         // The over-head speech bubble: dark backing quad, name and line in the
