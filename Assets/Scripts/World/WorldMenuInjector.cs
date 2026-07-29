@@ -16,6 +16,9 @@ namespace NSMB.World {
         private RectTransform anchor;
         private GameObject newsBoard;
         private Coroutine watcher;
+        // Tracked from the load event: their menu can arrive additively, so the
+        // active scene is not a reliable way to ask "are we in the menu".
+        private string currentScene = "";
         private readonly List<GameObject> siblings = new();
         private readonly List<GameObject> chooser = new();
         private AudioSource music;
@@ -41,6 +44,7 @@ namespace NSMB.World {
                 StopCoroutine(watcher);
                 watcher = null;
             }
+            currentScene = scene.name;
             if (scene.name == "MainMenu") {
                 watcher = StartCoroutine(Watch());
             } else {
@@ -62,7 +66,7 @@ namespace NSMB.World {
 
         private IEnumerator Watch() {
             var wait = new WaitForSeconds(0.4f);
-            while (SceneManager.GetActiveScene().name == "MainMenu") {
+            while (currentScene == "MainMenu") {
                 if (chooser.Count == 0) {
                     TryInject();
                 }
