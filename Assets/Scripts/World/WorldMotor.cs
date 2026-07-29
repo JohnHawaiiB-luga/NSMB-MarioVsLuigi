@@ -48,6 +48,19 @@ namespace NSMB.World {
                 Grounded = Physics.CapsuleCast(b, t, capsule.radius, Vector3.down, out _, Skin * 3f, ~0, QueryTriggerInteraction.Ignore);
             }
 
+            // Physics-independent floor: the builder baked where the ground is.
+            // If a fall carried us below it, the heightmap wins over PhysX.
+            if (WorldHeightmap.TryGetFloor(transform.position, out float floorTop)) {
+                if (transform.position.y < floorTop) {
+                    transform.position = new Vector3(transform.position.x, floorTop, transform.position.z);
+                    Grounded = true;
+                }
+            } else if (transform.position.y < -6f) {
+                // Off the baked corridor and under the world: back to the start.
+                transform.position = new Vector3(0f, 0.5f, -2f);
+                Grounded = false;
+            }
+
             Velocity = (transform.position - start) / Mathf.Max(Time.deltaTime, 0.0001f);
         }
 

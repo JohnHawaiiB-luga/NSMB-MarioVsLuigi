@@ -60,6 +60,11 @@ namespace NSMB.WorldEditor {
 
             float zCursor = 0f;
             var sectionStarts = new List<float>();
+            BakeOrigin = -8f;
+            Bake = new float[900];
+            for (int i = 0; i < Bake.Length; i++) {
+                Bake[i] = -7.5f;
+            }
             string[] stages = {
                 "Assets/Scenes/Levels/DefaultGrassLevel.unity",
                 "Assets/Scenes/Levels/DefaultBrickLevel.unity",
@@ -181,6 +186,12 @@ namespace NSMB.WorldEditor {
             Portal("Door-HawaiiOS", new Vector3(2.4f, 0, sectionStarts[1] - 5f), NeonBlue, "HawaiiOS\n<size=55%>his operating system — press E</size>", null, "https://erikgaren.com/os");
             Portal("Door-Portfolio", new Vector3(-2.4f, 0, sectionStarts[2] - 5f), NeonCyan, "THE CV\n<size=55%>recruiter door — press E</size>", null, "https://erikgaren.com/");
             Portal("Door-Versus", new Vector3(0f, 0, worldEnd - 3f), NeonRed, "THE ARCADE\n<size=55%>versus — the classic, press E</size>", "MainMenu", null);
+
+            // Physics-independent ground truth for the motor's fallback.
+            var mapGo = new GameObject("Heightmap");
+            var hm = mapGo.AddComponent<WorldHeightmap>();
+            hm.zOrigin = BakeOrigin;
+            hm.floorTops = Bake.Take(Mathf.CeilToInt(worldEnd - BakeOrigin) + 16).ToArray();
 
             // Dev-room fun facts floating around.
             DevFact(new Vector3(-2.4f, 2.2f, sectionStarts[0] + 12f), "// TODO: replace placeholder plumbers\n// legal says hi");
@@ -412,6 +423,9 @@ namespace NSMB.WorldEditor {
             go.transform.localScale = size;
             go.GetComponent<Renderer>().sharedMaterial = mat;
             go.isStatic = true;
+            for (float z = pos.z - size.z / 2f; z < pos.z + size.z / 2f; z += 1f) {
+                RecordFloor(z + 0.5f, pos.y + size.y / 2f);
+            }
         }
 
         private static void Backdrop(string name, Vector3 pos, Quaternion rot, Vector2 size) {
@@ -432,6 +446,19 @@ namespace NSMB.WorldEditor {
         }
 
         private const float Lane = 8f;
+        private static float[] Bake;
+        private static float BakeOrigin;
+
+        // Floor-like tops (ankle to head height) enter the baked heightmap.
+        private static void RecordFloor(float z, float top) {
+            if (Bake == null || top < -1f || top > 2.5f) {
+                return;
+            }
+            int i = Mathf.FloorToInt(z - BakeOrigin);
+            if (i >= 0 && i < Bake.Length) {
+                Bake[i] = Mathf.Max(Bake[i], top);
+            }
+        }
 
         // Opens a level scene additively, finds its most-used tilemap (the solid
         // layer), and extrudes a horizontal slice of it into corridor geometry:
@@ -494,6 +521,7 @@ namespace NSMB.WorldEditor {
                         cube.transform.localScale = new Vector3(Lane, 1f, 1f);
                         cube.GetComponent<Renderer>().sharedMaterial = mat;
                         cube.isStatic = true;
+                        RecordFloor(cube.transform.position.z, cube.transform.position.y + 0.5f);
                     }
                 }
                 return zStart + (x1 - x0);
