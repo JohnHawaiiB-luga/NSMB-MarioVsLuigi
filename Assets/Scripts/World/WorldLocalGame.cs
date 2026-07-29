@@ -43,7 +43,7 @@ namespace NSMB.World {
             if (!start.Result) {
                 Running = false;
                 Debug.LogWarning("[World] local session failed to start — falling back to the standalone hub");
-                yield return WorldTransition.ToScene("WorldHub");
+                WorldTransition.Run(WorldTransition.ToScene("WorldHub"));
                 yield break;
             }
 

@@ -14,6 +14,8 @@ namespace NSMB.World {
 
         private Button.ButtonClickedEvent versusAction;
         private RectTransform anchor;
+        private GameObject newsBoard;
+        private Coroutine watcher;
         private readonly List<GameObject> siblings = new();
         private readonly List<GameObject> chooser = new();
         private AudioSource music;
@@ -32,14 +34,20 @@ namespace NSMB.World {
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
             siblings.Clear();
             chooser.Clear();
+            newsBoard = null;
             versusAction = null;
             anchor = null;
+            if (watcher != null) {
+                StopCoroutine(watcher);
+                watcher = null;
+            }
             if (scene.name == "MainMenu") {
-                StartCoroutine(Watch());
+                watcher = StartCoroutine(Watch());
             } else {
                 // The menu theme must not follow the player into a match or the
-                // hub — both bring their own.
-                StopAllCoroutines();
+                // hub — both bring their own. Only the watcher is stopped here:
+                // stopping every coroutine also killed the loading-screen
+                // transition mid-flight, which left the loader on screen forever.
                 StopMusic();
             }
         }
@@ -54,13 +62,14 @@ namespace NSMB.World {
 
         private IEnumerator Watch() {
             var wait = new WaitForSeconds(0.4f);
-            for (int i = 0; i < 300; i++) {
+            while (SceneManager.GetActiveScene().name == "MainMenu") {
                 if (chooser.Count == 0) {
                     TryInject();
                 }
                 SwapMusic();
                 yield return wait;
             }
+            StopMusic();
         }
 
         private void SwapMusic() {
@@ -108,11 +117,17 @@ namespace NSMB.World {
 
             anchor = play.GetComponent<RectTransform>();
             siblings.Clear();
-            // Only their buttons hide behind the fork — the News Board shares
-            // this parent, and hiding it blanked the board.
             foreach (Transform child in play.transform.parent) {
                 if (child.name.StartsWith("Btn")) {
                     siblings.Add(child.gameObject);
+                }
+            }
+            // The board belongs to the front page of the menu, so it steps
+            // aside with the buttons — the way their own submenus replace it.
+            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
+                if (t.name == "NewsBoard") {
+                    newsBoard = t.gameObject;
+                    break;
                 }
             }
 
@@ -168,6 +183,9 @@ namespace NSMB.World {
                     go.SetActive(false);
                 }
             }
+            if (newsBoard) {
+                newsBoard.SetActive(false);
+            }
             bool laidOut = anchor && anchor.parent && anchor.parent.GetComponent<LayoutGroup>();
             float step = anchor ? anchor.rect.height + 14f : 90f;
             for (int i = 0; i < chooser.Count; i++) {
@@ -195,6 +213,9 @@ namespace NSMB.World {
                 if (go) {
                     go.SetActive(true);
                 }
+            }
+            if (newsBoard) {
+                newsBoard.SetActive(true);
             }
         }
     }
