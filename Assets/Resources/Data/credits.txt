@@ -1,3 +1,20 @@
+<color=yellow>John Hawaii B. Luga's World</color>
+a 3D free-roam hub built onto this game
+by David Erik García Arenas
+erikgaren.com
+
+<color=yellow>World build</color>
+hub, movement chassis, dialogue and web deployment
+by David Erik García Arenas — also known as John Hawaii B. Luga
+
+Mario and Luigi appear as placeholders while
+original characters are being sculpted.
+
+<color=yellow>the game underneath</color>
+NSMB-MarioVsLuigi, reused with the developers' permission.
+Everything below this line is their work — and the Versus
+mode you can play from the main menu is theirs, untouched.
+
 <color=yellow>{ui.about.credits.gameby}</color>
 ipodtouch0218
 
