@@ -31,29 +31,20 @@ namespace NSMB.World {
         }
 
         private void Awake() {
-            SceneManager.sceneLoaded += OnSceneLoaded;
+            // One watcher for the lifetime of the game. Scene names proved
+            // useless here: their menu loads a stage in the background as its
+            // own scene, so "which scene are we in" keeps changing while the
+            // menu is very much still on screen. Presence of BtnPlay is the
+            // only honest signal.
+            StartCoroutine(Watch());
         }
 
-        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
+        private void Forget() {
             siblings.Clear();
             chooser.Clear();
             newsBoard = null;
             versusAction = null;
             anchor = null;
-            if (watcher != null) {
-                StopCoroutine(watcher);
-                watcher = null;
-            }
-            currentScene = scene.name;
-            if (scene.name == "MainMenu") {
-                watcher = StartCoroutine(Watch());
-            } else {
-                // The menu theme must not follow the player into a match or the
-                // hub — both bring their own. Only the watcher is stopped here:
-                // stopping every coroutine also killed the loading-screen
-                // transition mid-flight, which left the loader on screen forever.
-                StopMusic();
-            }
         }
 
         private void StopMusic() {
@@ -66,14 +57,30 @@ namespace NSMB.World {
 
         private IEnumerator Watch() {
             var wait = new WaitForSeconds(0.4f);
-            while (currentScene == "MainMenu") {
-                if (chooser.Count == 0) {
-                    TryInject();
+            while (true) {
+                bool inMenu = FindPlayButton();
+                if (inMenu) {
+                    if (chooser.Count == 0) {
+                        TryInject();
+                    }
+                    SwapMusic();
+                } else if (music || chooser.Count > 0) {
+                    // The menu is gone: drop the theme and forget the buttons,
+                    // so the next visit rebuilds cleanly.
+                    StopMusic();
+                    Forget();
                 }
-                SwapMusic();
                 yield return wait;
             }
-            StopMusic();
+        }
+
+        private Button FindPlayButton() {
+            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Exclude, FindObjectsSortMode.None)) {
+                if (t.name == "BtnPlay") {
+                    return t.GetComponent<Button>();
+                }
+            }
+            return null;
         }
 
         private void SwapMusic() {
@@ -105,16 +112,7 @@ namespace NSMB.World {
         // The menu's buttons are PipeButton prefab instances named BtnPlay,
         // BtnOptions, BtnReplays, BtnAddons, BtnAbout, BtnQuit.
         private void TryInject() {
-            Button play = null;
-            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
-                if (t.name != "BtnPlay") {
-                    continue;
-                }
-                play = t.GetComponent<Button>();
-                if (play) {
-                    break;
-                }
-            }
+            Button play = FindPlayButton();
             if (!play || !play.transform.parent) {
                 return;
             }

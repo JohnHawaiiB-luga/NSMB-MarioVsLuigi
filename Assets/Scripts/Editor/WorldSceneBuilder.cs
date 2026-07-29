@@ -119,7 +119,7 @@ namespace NSMB.WorldEditor {
 
             var musicGo = new GameObject("Music");
             var music = musicGo.AddComponent<AudioSource>();
-            music.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/music/results.ogg");
+            music.clip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Sound/music/mainmenu.ogg");
             music.loop = true;
             music.playOnAwake = true;
             music.volume = 0.42f;
