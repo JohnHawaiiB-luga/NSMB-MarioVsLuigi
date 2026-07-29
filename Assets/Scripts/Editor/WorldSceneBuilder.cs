@@ -66,6 +66,9 @@ namespace NSMB.WorldEditor {
                 Bake[i] = -7.5f;
             }
             string[] stages = {
+                // The devs' own level template opens the hub — the closest thing
+                // to a test map the source ships, and a fitting front porch.
+                "Assets/Scenes/LevelTemplate.unity",
                 "Assets/Scenes/Levels/DefaultGrassLevel.unity",
                 "Assets/Scenes/Levels/DefaultBrickLevel.unity",
                 "Assets/Scenes/Levels/DefaultCastle.unity",
@@ -177,7 +180,7 @@ namespace NSMB.WorldEditor {
 
             // Story beats at each stage section — a conversation between the two
             // of them, placeholder bodies acknowledged in-fiction.
-            Trigger(new Vector3(0, 1, sectionStarts[0] + 3f),
+            Trigger(new Vector3(0, 1, sectionStarts[0] + 4f),
                 "ERIK (luigi.tmp)|Oh! A visitor! Welcome to the World. I'm Erik — or I will be, once the boss sculpts me a body. For now I'm, um. Borrowing Luigi.",
                 "DAVID (mario.tmp)|And I'm David — same person as Erik, long story, good lore. Currently shaped like a certain plumber. Nintendo, if you're reading this: placeholders! Temporary! Don't sue, pweaseeee.",
                 "ERIK (luigi.tmp)|He's serious, there's a roadmap and everything. This test map is stitched from the Versus stages — walk on, we'll explain him as we go.");
