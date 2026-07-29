@@ -824,7 +824,7 @@ PlayerSettings:
   blurSplashScreenBackground: 1
   spritePackerPolicy: 
   webGLMemorySize: 16
-  webGLExceptionSupport: 1
+  webGLExceptionSupport: 3
   webGLNameFilesAsHashes: 0
   webGLShowDiagnostics: 0
   webGLDataCaching: 1
@@ -991,7 +991,13 @@ PlayerSettings:
   windowsGamepadBackendHint: 0
   cloudProjectId: 3c43f6a5-de2f-4b33-8870-8e6e50f8d55b
   framebufferDepthMemorylessMode: 0
-  qualitySettingsNames: []
+  qualitySettingsNames:
+  - Very Low
+  - Medium
+  - Low
+  - High
+  - Very High
+  - Ultra
   projectName: mariooo
   organizationId: danny-a-4565693
   cloudEnabled: 0

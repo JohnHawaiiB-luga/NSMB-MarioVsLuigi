@@ -29,8 +29,17 @@ namespace NSMB.World {
         private const float SlotStep = 0.10f;
         private const float ShiftAbove = 0.55f;
 
+        private const string ModeBlurb =
+            "<b>WORLD HUB</b>\n" +
+            "The walkable half of erikgaren.com — my own stage on this game's " +
+            "engine. No timer, nothing to chase: wander and read the signs.\n\n" +
+            "<b>PLAY GAME</b>\n" +
+            "The classic mode, untouched — online multiplayer on my own server.";
+
         private Button worldButton;
+        private Button labButton;
         private GameObject blurb;
+        private TMP_Text blurbText;
         private GameObject newsBoard;
         private AudioSource music;
         private readonly List<NSMB.Sound.LoopingMusicPlayer> silenced = new();
@@ -134,6 +143,7 @@ namespace NSMB.World {
                 WorldLocalGame.Launch();
             });
 
+            RepurposeAddons(play.transform.parent);
             Link(play);
             FindBoard();
             Debug.Log("[World] World Hub added to the menu above BtnPlay");
@@ -170,6 +180,32 @@ namespace NSMB.World {
             }
         }
 
+        // Addons cannot work in a browser build, so their button sits switched
+        // off and leaves a hole in the column. It becomes the Lab: the stage
+        // audit, run against whatever this build actually carries.
+        private void RepurposeAddons(Transform parent) {
+            var addons = parent.Find("BtnAddons");
+            if (!addons) {
+                return;
+            }
+            addons.gameObject.SetActive(true);
+
+            foreach (var mb in addons.GetComponentsInChildren<MonoBehaviour>(true)) {
+                if (mb && mb.GetType().Name.Contains("Translat")) {
+                    Destroy(mb);
+                }
+            }
+            foreach (var text in addons.GetComponentsInChildren<TMP_Text>(true)) {
+                text.text = "Lab";
+            }
+
+            labButton = addons.GetComponent<Button>();
+            if (labButton) {
+                labButton.onClick = new Button.ButtonClickedEvent();
+                labButton.onClick.AddListener(WorldLab.Invalidate);
+            }
+        }
+
         private static void Slot(RectTransform rect, float height) {
             rect.anchorMin = new Vector2(rect.anchorMin.x, height);
             rect.anchorMax = new Vector2(rect.anchorMax.x, height);
@@ -185,15 +221,26 @@ namespace NSMB.World {
             }
         }
 
-        // The board keeps its place; its posts step aside for a word about the
-        // hub while the button is highlighted, and come back afterwards.
+        // The board keeps its place; its posts step aside for whatever the
+        // highlighted button has to say — a word about the modes, or the stage
+        // audit — and come back afterwards.
         private void UpdateBlurb() {
-            if (!newsBoard || !worldButton) {
+            if (!newsBoard) {
                 return;
             }
 
-            bool show = UnityEngine.EventSystems.EventSystem.current
-                && UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject == worldButton.gameObject;
+            GameObject selected = UnityEngine.EventSystems.EventSystem.current
+                ? UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject
+                : null;
+
+            string text = null;
+            if (worldButton && selected == worldButton.gameObject) {
+                text = ModeBlurb;
+            } else if (labButton && selected == labButton.gameObject) {
+                text = WorldLab.Report();
+            }
+
+            bool show = text != null;
 
             if (show && !blurb) {
                 // The menu rebuilds its objects on every visit, so a blurb from
@@ -201,6 +248,9 @@ namespace NSMB.World {
                 // they stack, one more each visit.
                 var existing = newsBoard.transform.Find("WorldModeBlurb");
                 blurb = existing ? existing.gameObject : null;
+                if (blurb) {
+                    blurbText = blurb.GetComponent<TMP_Text>();
+                }
             }
 
             if (show && !blurb) {
@@ -216,12 +266,7 @@ namespace NSMB.World {
                 tmp.fontSizeMin = 8f;
                 tmp.fontSizeMax = 22f;
                 tmp.overflowMode = TextOverflowModes.Truncate;
-                tmp.text =
-                    "<b>WORLD HUB</b>\n" +
-                    "The walkable half of erikgaren.com — my own stage on this game's " +
-                    "engine. No timer, nothing to chase: wander and read the signs.\n\n" +
-                    "<b>PLAY GAME</b>\n" +
-                    "The classic mode, untouched — online multiplayer on my own server.";
+                blurbText = tmp;
                 var rt = tmp.rectTransform;
                 rt.anchorMin = Vector2.zero;
                 rt.anchorMax = Vector2.one;
@@ -230,6 +275,9 @@ namespace NSMB.World {
                 blurb = go;
             }
 
+            if (show && blurbText && blurbText.text != text) {
+                blurbText.text = text;
+            }
             if (blurb) {
                 blurb.SetActive(show);
             }
