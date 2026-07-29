@@ -262,44 +262,78 @@ namespace NSMB.WorldEditor {
             Debug.Log($"[WorldStageBuilder] blended {blended} stages: strip is {hubMap.cellBounds.size.x}x{hubMap.cellBounds.size.y} tiles, {stars} star spawns");
         }
 
-        // Brings a stage's live content across: anything carrying a Quantum
-        // entity prototype (enemies, blocks, coins, powerups, movers) plus its
-        // star spawns, up to the simulation's ceiling.
+        // Brings a stage's live content across: whole subtrees that hold Quantum
+        // entity prototypes — enemies, blocks, coins, powerups, spinners, movers
+        // — plus its star spawns, up to the simulation's ceiling.
+        //
+        // Copied as whole roots, deliberately. Lifting each prototype object out
+        // on its own broke every reference that pointed sideways or upwards
+        // instead of down: a spinner's SpinnerAnimator keeps a Transform for the
+        // part that turns, and once its stage was closed that reference was null,
+        // so the view threw on every frame. One view throwing inside
+        // QuantumEntityViewUpdater's loop stops every entity after it from being
+        // updated at all — the whole world freezes over a single field.
         private static void Adopt(Scene src, Scene hub, Vector3 offset, string path, ref int stars) {
             var container = new GameObject("Blend_" + Path.GetFileNameWithoutExtension(path));
             SceneManager.MoveGameObjectToScene(container, hub);
 
-            var wanted = new HashSet<GameObject>();
+            int copied = 0;
             foreach (var root in src.GetRootGameObjects()) {
+                if (Infrastructure(root)) {
+                    continue;
+                }
+
+                bool carriesEntities = false;
                 foreach (var mb in root.GetComponentsInChildren<MonoBehaviour>(true)) {
                     if (mb && mb.GetType().Name.StartsWith("QPrototype")) {
-                        wanted.Add(mb.gameObject);
-                    }
-                }
-                foreach (var t in root.GetComponentsInChildren<Transform>(true)) {
-                    if (t.CompareTag("StarSpawn") && stars < MaxStarSpawns) {
-                        wanted.Add(t.gameObject);
-                        stars++;
-                    }
-                }
-            }
-
-            // A prototype nested under another would otherwise be copied twice,
-            // once on its own and once inside its parent.
-            foreach (var go in new List<GameObject>(wanted)) {
-                for (Transform p = go.transform.parent; p; p = p.parent) {
-                    if (wanted.Contains(p.gameObject)) {
-                        wanted.Remove(go);
+                        carriesEntities = true;
                         break;
                     }
                 }
+
+                var spawns = new List<Transform>();
+                foreach (var t in root.GetComponentsInChildren<Transform>(true)) {
+                    if (t.CompareTag("StarSpawn")) {
+                        spawns.Add(t);
+                    }
+                }
+
+                if (!carriesEntities && spawns.Count == 0) {
+                    continue;
+                }
+
+                var clone = UnityEngine.Object.Instantiate(root, container.transform);
+                clone.name = root.name;
+                clone.transform.position += offset;
+                copied++;
+
+                // Star spawns are capped by the simulation, so trim the copy
+                // rather than let the bake throw on the count.
+                foreach (var t in clone.GetComponentsInChildren<Transform>(true)) {
+                    if (!t || !t.CompareTag("StarSpawn")) {
+                        continue;
+                    }
+                    if (stars < MaxStarSpawns) {
+                        stars++;
+                    } else {
+                        UnityEngine.Object.DestroyImmediate(t.gameObject);
+                    }
+                }
             }
 
-            foreach (var go in wanted) {
-                var clone = UnityEngine.Object.Instantiate(
-                    go, go.transform.position + offset, go.transform.rotation, container.transform);
-                clone.name = go.name;
+            if (copied == 0) {
+                UnityEngine.Object.DestroyImmediate(container);
             }
+        }
+
+        // Roots that describe the stage itself rather than things standing in it.
+        // The tilemap is copied cell by cell and the map data belongs to the hub,
+        // so bringing either across would fight what is already there.
+        private static bool Infrastructure(GameObject root) {
+            return root.GetComponentInChildren<Tilemap>(true)
+                || root.GetComponentInChildren<QuantumMapData>(true)
+                || root.GetComponentInChildren<Camera>(true)
+                || root.GetComponentInChildren<Canvas>(true);
         }
 
         // The part that makes this a portfolio rather than a playground: Luigi

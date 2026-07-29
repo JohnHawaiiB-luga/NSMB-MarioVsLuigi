@@ -53,13 +53,14 @@ namespace NSMB.World {
                     lines.Append("FAIL ");
                 }
 
-                string name = string.IsNullOrEmpty(stage.TranslationKey) ? "(unnamed)" : stage.TranslationKey;
-                lines.Append(name).Append("  ")
-                    .Append(stage.TileDimensions.X).Append('x').Append(stage.TileDimensions.Y)
-                    .Append("  ").Append(stage.MainMusic == null ? 0 : stage.MainMusic.Length).Append(" trk")
-                    .Append("  ").Append(stage.BigStarSpawnpoints == null ? 0 : stage.BigStarSpawnpoints.Length).Append(" spawns");
+                // One stage per line, or the board wraps every row into three and
+                // the whole report becomes unreadable.
+                lines.Append(ShortName(stage).PadRight(12))
+                    .Append(' ').Append($"{stage.TileDimensions.X}x{stage.TileDimensions.Y}".PadRight(8))
+                    .Append(stage.MainMusic == null ? 0 : stage.MainMusic.Length).Append("m ")
+                    .Append(stage.BigStarSpawnpoints == null ? 0 : stage.BigStarSpawnpoints.Length).Append('s');
                 if (fault != null) {
-                    lines.Append("  — ").Append(fault);
+                    lines.Append(" — ").Append(fault);
                 }
                 lines.Append('\n');
             }
@@ -71,12 +72,22 @@ namespace NSMB.World {
             }
             builder.Append("\n\n").Append(lines);
 
-            builder.Append("\nChecks: music list non-empty (GetCurrentMusic takes a modulo of its length), "
-                + "star spawns present (the spawner takes a modulo of their count), spawn point away from the "
-                + "origin, tile data matching the baked dimensions.\n");
+            builder.Append("\n<i>size · m=music tracks · s=star spawns. Each check guards a field the "
+                + "simulation reads without guarding: an empty music list or spawn table is a modulo by "
+                + "zero the instant play begins.</i>\n");
 
             cached = builder.ToString();
             return cached;
+        }
+
+        // "levels.custom.worldhub" is mostly prefix; the leaf is what identifies it.
+        private static string ShortName(VersusStageData stage) {
+            string key = stage.TranslationKey;
+            if (string.IsNullOrEmpty(key)) {
+                return "(unnamed)";
+            }
+            int dot = key.LastIndexOf('.');
+            return dot >= 0 && dot < key.Length - 1 ? key[(dot + 1)..] : key;
         }
 
         private static string Fault(VersusStageData stage) {

@@ -527279,11 +527279,15 @@ MonoBehaviour:
   - X:
       RawValue: 1900544
     Y:
-      RawValue: 196608
+      RawValue: 32768
   - X:
       RawValue: 1212416
     Y:
-      RawValue: 163840
+      RawValue: 32768
+  - X:
+      RawValue: 1507328
+    Y:
+      RawValue: -98304
   - X:
       RawValue: 1441792
     Y:
@@ -527291,41 +527295,29 @@ MonoBehaviour:
   - X:
       RawValue: 1212416
     Y:
-      RawValue: -98304
+      RawValue: 163840
   - X:
-      RawValue: 1900544
+      RawValue: 1212416
     Y:
-      RawValue: 32768
+      RawValue: -98304
   - X:
       RawValue: 1703936
     Y:
       RawValue: -98304
   - X:
-      RawValue: 1507328
+      RawValue: 1900544
     Y:
-      RawValue: -98304
-  - X:
-      RawValue: 1212416
-    Y:
-      RawValue: 32768
-  - X:
-      RawValue: 3702784
-    Y:
-      RawValue: 229376
+      RawValue: 196608
   - X:
       RawValue: 3899392
     Y:
       RawValue: 294912
   - X:
-      RawValue: 3538944
+      RawValue: 3964928
     Y:
-      RawValue: 98304
+      RawValue: 65536
   - X:
       RawValue: 3276800
-    Y:
-      RawValue: 262144
-  - X:
-      RawValue: 2260992
     Y:
       RawValue: 262144
   - X:
@@ -527333,39 +527325,27 @@ MonoBehaviour:
     Y:
       RawValue: 294912
   - X:
-      RawValue: 3047424
+      RawValue: 2260992
     Y:
-      RawValue: 98304
-  - X:
-      RawValue: 3964928
-    Y:
-      RawValue: 65536
+      RawValue: 262144
   - X:
       RawValue: 3080847
     Y:
       RawValue: 327680
   - X:
-      RawValue: 6488064
+      RawValue: 3702784
     Y:
-      RawValue: -327680
+      RawValue: 229376
   - X:
-      RawValue: 6291456
+      RawValue: 3047424
     Y:
-      RawValue: -327680
+      RawValue: 98304
   - X:
-      RawValue: 6193152
+      RawValue: 3538944
     Y:
-      RawValue: -131072
+      RawValue: 98304
   - X:
-      RawValue: 5767168
-    Y:
-      RawValue: -196608
-  - X:
-      RawValue: 5636096
-    Y:
-      RawValue: -196608
-  - X:
-      RawValue: 5439488
+      RawValue: 4816896
     Y:
       RawValue: -163840
   - X:
@@ -527373,19 +527353,43 @@ MonoBehaviour:
     Y:
       RawValue: -262144
   - X:
-      RawValue: 4816896
+      RawValue: 5636096
+    Y:
+      RawValue: -196608
+  - X:
+      RawValue: 6488064
+    Y:
+      RawValue: -327680
+  - X:
+      RawValue: 5767168
+    Y:
+      RawValue: -196608
+  - X:
+      RawValue: 6193152
+    Y:
+      RawValue: -131072
+  - X:
+      RawValue: 6291456
+    Y:
+      RawValue: -327680
+  - X:
+      RawValue: 5439488
     Y:
       RawValue: -163840
   - X:
-      RawValue: 7733248
+      RawValue: 8617984
     Y:
-      RawValue: 360448
+      RawValue: 491520
   - X:
-      RawValue: 7733248
+      RawValue: 9338880
     Y:
-      RawValue: -65536
+      RawValue: 0
   - X:
       RawValue: 7274496
+    Y:
+      RawValue: 65536
+  - X:
+      RawValue: 10027008
     Y:
       RawValue: 65536
   - X:
@@ -527393,47 +527397,31 @@ MonoBehaviour:
     Y:
       RawValue: 262144
   - X:
+      RawValue: 7733248
+    Y:
+      RawValue: -65536
+  - X:
       RawValue: 6324224
     Y:
       RawValue: 65536
   - X:
-      RawValue: 8617984
+      RawValue: 7733248
     Y:
-      RawValue: 491520
-  - X:
-      RawValue: 10027008
-    Y:
-      RawValue: 65536
-  - X:
-      RawValue: 9338880
-    Y:
-      RawValue: 0
-  - X:
-      RawValue: 12468224
-    Y:
-      RawValue: -98304
-  - X:
-      RawValue: 12746752
-    Y:
-      RawValue: 98304
-  - X:
-      RawValue: 12910592
-    Y:
-      RawValue: -196608
-  - X:
-      RawValue: 11304960
-    Y:
-      RawValue: 163840
+      RawValue: 360448
   - X:
       RawValue: 12025856
     Y:
       RawValue: -229376
   - X:
-      RawValue: 11730944
+      RawValue: 12042240
     Y:
-      RawValue: 262144
+      RawValue: 16384
   - X:
-      RawValue: 12304384
+      RawValue: 11304960
+    Y:
+      RawValue: 163840
+  - X:
+      RawValue: 11730944
     Y:
       RawValue: 262144
   - X:
@@ -527441,25 +527429,25 @@ MonoBehaviour:
     Y:
       RawValue: 262144
   - X:
-      RawValue: 12042240
+      RawValue: 12910592
     Y:
-      RawValue: 16384
+      RawValue: -196608
+  - X:
+      RawValue: 12468224
+    Y:
+      RawValue: -98304
   - X:
       RawValue: 11599872
     Y:
       RawValue: -65536
   - X:
-      RawValue: 13565952
+      RawValue: 12746752
     Y:
-      RawValue: 163840
+      RawValue: 98304
   - X:
-      RawValue: 14155776
+      RawValue: 12304384
     Y:
-      RawValue: 327680
-  - X:
-      RawValue: 14712832
-    Y:
-      RawValue: 294912
+      RawValue: 262144
   - X:
       RawValue: 15007744
     Y:
@@ -527473,6 +527461,22 @@ MonoBehaviour:
     Y:
       RawValue: 98304
   - X:
+      RawValue: 13565952
+    Y:
+      RawValue: 163840
+  - X:
+      RawValue: 14155776
+    Y:
+      RawValue: 327680
+  - X:
+      RawValue: 14712832
+    Y:
+      RawValue: 294912
+  - X:
+      RawValue: 16285696
+    Y:
+      RawValue: 163840
+  - X:
       RawValue: 19857408
     Y:
       RawValue: 425984
@@ -527481,17 +527485,13 @@ MonoBehaviour:
     Y:
       RawValue: 32768
   - X:
-      RawValue: 16285696
+      RawValue: 17465344
     Y:
-      RawValue: 163840
+      RawValue: 425984
   - X:
       RawValue: 17203200
     Y:
       RawValue: 163840
-  - X:
-      RawValue: 17465344
-    Y:
-      RawValue: 425984
   - X:
       RawValue: 18382848
     Y:
