@@ -122,7 +122,8 @@ namespace NSMB.World {
 
             chooser.Add(Clone(play, "World Hub", new Color(0.55f, 0.18f, 0.85f), () => {
                 StopMusic();
-                StartCoroutine(WorldTransition.ToScene("WorldHub"));
+                // Their own simulation, single player, nothing to chase.
+                WorldLocalGame.Launch();
             }));
             chooser.Add(Clone(play, "Versus", new Color(0.13f, 0.42f, 0.85f), () => {
                 Restore();
