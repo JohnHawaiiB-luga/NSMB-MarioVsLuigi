@@ -174,6 +174,9 @@ namespace NSMB.World {
             var button = clone.GetComponent<Button>();
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener(action);
+            if (!clone.GetComponent<WorldMenuButtonSfx>()) {
+                clone.AddComponent<WorldMenuButtonSfx>();
+            }
 
             clone.SetActive(false);
             return clone;
