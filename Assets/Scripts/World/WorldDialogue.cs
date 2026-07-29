@@ -1,10 +1,11 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace NSMB.World {
-    // Speech bubbles over the speakers' heads, name on top, advanced with E or
-    // by themselves. Lines carry their speaker as "NAME|text"; the bubble hops
-    // to whichever WorldSpeaker matches the name.
+    // Speech in the game's own dressing: its 9-sliced dialogue panel floating
+    // over the speaker's head, its font, its typing sounds, and its button
+    // prompt blinking when a line is ready to advance.
     public class WorldDialogue : MonoBehaviour {
 
         public static WorldDialogue Instance { get; private set; }
@@ -13,15 +14,20 @@ namespace NSMB.World {
         public GameObject bubble;
         public TMP_Text nameText;
         public TMP_Text lineText;
-        public Transform panel;
+        public Image prompt;
         public AudioSource voice;
-        public float autoAdvanceSeconds = 5f;
+        public AudioClip typeClip, openClip, doneClip;
+        public float charsPerSecond = 42f;
+        public float autoAdvanceSeconds = 6f;
 
         private readonly System.Collections.Generic.Queue<(string speaker, string line)> queue = new();
         private WorldSpeaker[] speakers;
         private WorldSpeaker current;
-        private float shownAt;
         private Controls controls;
+        private string full = "";
+        private float shownAt;
+        private int revealed;
+        private float typeCooldown;
 
         private void Awake() {
             Instance = this;
@@ -60,17 +66,20 @@ namespace NSMB.World {
                 current = null;
                 return;
             }
+            bool wasOpen = bubble.activeSelf;
             (string speaker, string line) = queue.Dequeue();
             bubble.SetActive(true);
             nameText.text = speaker;
-            nameText.color = speaker.Contains("DAVID") ? new Color(1f, 0.45f, 0.35f)
+            nameText.color = speaker.Contains("DAVID") ? new Color(1f, 0.5f, 0.38f)
                 : speaker.Contains("ERIK") ? new Color(0.5f, 0.95f, 0.55f)
                 : Color.white;
-            lineText.text = line;
+            full = line;
+            revealed = 0;
+            lineText.text = "";
             shownAt = Time.time;
             current = Find(speaker);
-            if (voice && voice.clip) {
-                voice.PlayOneShot(voice.clip);
+            if (!wasOpen && voice && openClip) {
+                voice.PlayOneShot(openClip, 0.6f);
             }
             Place();
         }
@@ -85,10 +94,9 @@ namespace NSMB.World {
         }
 
         private void Place() {
-            if (!current) {
-                return;
+            if (current) {
+                bubble.transform.position = current.transform.position + Vector3.up * current.bubbleHeight;
             }
-            bubble.transform.position = current.transform.position + Vector3.up * current.bubbleHeight;
         }
 
         private void Update() {
@@ -100,11 +108,45 @@ namespace NSMB.World {
             if (cam) {
                 bubble.transform.rotation = Quaternion.LookRotation(bubble.transform.position - cam.transform.position, Vector3.up);
             }
-            bool advance = Time.time - shownAt > autoAdvanceSeconds;
-            if (controls != null && controls.Player.PowerupAction.WasPressedThisFrame()) {
-                advance = true;
+
+            bool typing = revealed < full.Length;
+            if (typing) {
+                typeCooldown -= Time.deltaTime;
+                int want = Mathf.Min(full.Length, Mathf.CeilToInt((Time.time - shownAt) * charsPerSecond));
+                if (want > revealed) {
+                    // One blip every few characters, like their chat does.
+                    if (typeCooldown <= 0f && voice && typeClip) {
+                        voice.PlayOneShot(typeClip, 0.25f);
+                        typeCooldown = 0.055f;
+                    }
+                    revealed = want;
+                    lineText.text = full[..revealed];
+                }
             }
-            if (advance) {
+
+            if (prompt) {
+                prompt.enabled = !typing;
+                if (!typing) {
+                    var c = prompt.color;
+                    c.a = 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(Time.time * 3.4f));
+                    prompt.color = c;
+                }
+            }
+
+            bool pressed = controls != null && controls.Player.PowerupAction.WasPressedThisFrame();
+            if (typing) {
+                // First press completes the line, as their menus do.
+                if (pressed) {
+                    revealed = full.Length;
+                    lineText.text = full;
+                    if (voice && doneClip) {
+                        voice.PlayOneShot(doneClip, 0.5f);
+                    }
+                }
+                return;
+            }
+
+            if (pressed || Time.time - shownAt > autoAdvanceSeconds + full.Length / charsPerSecond) {
                 Next();
             }
         }

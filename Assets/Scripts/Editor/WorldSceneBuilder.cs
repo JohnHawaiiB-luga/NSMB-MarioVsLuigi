@@ -166,6 +166,7 @@ namespace NSMB.WorldEditor {
             camGo.transform.position = new Vector3(0f, 2.5f, -16f);
             var follow = camGo.AddComponent<WorldCamera>();
             follow.target = player.transform;
+            follow.swapClip = Clip("Assets/Sound/ui/camera_scroll.ogg");
             pctrl.cam = camGo.transform;
 
             var npc = new GameObject("Companion");
@@ -337,15 +338,20 @@ namespace NSMB.WorldEditor {
                     ? sprites.FirstOrDefault(s => s.name == spriteName) ?? sprites[0]
                     : sprites.OrderByDescending(s => s.rect.y).ThenBy(s => s.rect.x).First();
 
-                var src = pick.texture;
-                string srcPath = AssetDatabase.GetAssetPath(src);
-                var importer = (TextureImporter) AssetImporter.GetAtPath(srcPath);
+                // Crop from the source PNG, not sprite.texture — that one can be
+                // a packed atlas whose importer is not a TextureImporter.
+                var importer = AssetImporter.GetAtPath(atlasPath) as TextureImporter;
+                var src = AssetDatabase.LoadAssetAtPath<Texture2D>(atlasPath);
+                if (importer == null || src == null) {
+                    return Mat(new Color(0.5f, 0.35f, 0.2f));
+                }
                 bool wasReadable = importer.isReadable;
                 if (!wasReadable) {
                     importer.isReadable = true;
                     importer.SaveAndReimport();
+                    src = AssetDatabase.LoadAssetAtPath<Texture2D>(atlasPath);
                 }
-                var rect = pick.textureRect;
+                var rect = pick.rect;
                 var pixels = src.GetPixels((int) rect.x, (int) rect.y, (int) rect.width, (int) rect.height);
                 var tex = new Texture2D((int) rect.width, (int) rect.height, TextureFormat.RGBA32, false);
                 tex.SetPixels(pixels);
@@ -357,11 +363,12 @@ namespace NSMB.WorldEditor {
                     importer.SaveAndReimport();
                 }
                 AssetDatabase.ImportAsset(outPath);
-                var outImporter = (TextureImporter) AssetImporter.GetAtPath(outPath);
-                outImporter.wrapMode = TextureWrapMode.Repeat;
-                outImporter.filterMode = FilterMode.Point;
-                outImporter.textureCompression = TextureImporterCompression.Uncompressed;
-                outImporter.SaveAndReimport();
+                if (AssetImporter.GetAtPath(outPath) is TextureImporter outImporter) {
+                    outImporter.wrapMode = TextureWrapMode.Repeat;
+                    outImporter.filterMode = FilterMode.Point;
+                    outImporter.textureCompression = TextureImporterCompression.Uncompressed;
+                    outImporter.SaveAndReimport();
+                }
             }
 
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(outPath);
@@ -483,7 +490,10 @@ namespace NSMB.WorldEditor {
             var panel = new GameObject("Panel");
             panel.transform.SetParent(canvasGo.transform, false);
             var img = panel.AddComponent<Image>();
-            img.color = new Color(0f, 0f, 0f, 0.5f);
+            img.sprite = SpriteAsset("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px.png");
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = 0.4f;
+            img.color = new Color(0.06f, 0.08f, 0.13f, 0.88f);
             var prt = panel.GetComponent<RectTransform>();
             prt.anchorMin = new Vector2(0f, 1f);
             prt.anchorMax = new Vector2(0f, 1f);
@@ -513,62 +523,79 @@ namespace NSMB.WorldEditor {
             title.alignment = TextAlignmentOptions.TopRight;
         }
 
+        // The speech bubble is a world-space canvas wearing the game's own
+        // 9-sliced dialogue panel, its font and its button prompt.
         private static void BuildBubble() {
             var holder = new GameObject("Dialogue");
             var dlg = holder.AddComponent<WorldDialogue>();
 
             var bubble = new GameObject("Bubble");
             bubble.transform.SetParent(holder.transform, false);
+            var canvas = bubble.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var crt = bubble.GetComponent<RectTransform>();
+            crt.sizeDelta = new Vector2(520f, 190f);
+            crt.localScale = Vector3.one * 0.008f;
 
-            var back = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            Object.DestroyImmediate(back.GetComponent<Collider>());
-            back.name = "Back";
-            back.transform.SetParent(bubble.transform, false);
-            back.transform.localScale = new Vector3(3.6f, 1.2f, 1f);
-            var backMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            backMat.SetColor("_BaseColor", new Color(0.02f, 0.04f, 0.08f, 0.88f));
-            backMat.SetFloat("_Surface", 1f);
-            backMat.SetOverrideTag("RenderType", "Transparent");
-            backMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            backMat.SetInt("_SrcBlend", (int) UnityEngine.Rendering.BlendMode.SrcAlpha);
-            backMat.SetInt("_DstBlend", (int) UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            backMat.SetInt("_ZWrite", 0);
-            backMat.renderQueue = 3000;
-            back.GetComponent<Renderer>().sharedMaterial = backMat;
+            var panel = new GameObject("Panel");
+            panel.transform.SetParent(bubble.transform, false);
+            var panelImg = panel.AddComponent<Image>();
+            panelImg.sprite = SpriteAsset("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px-dialogue.png");
+            panelImg.type = Image.Type.Sliced;
+            panelImg.pixelsPerUnitMultiplier = 0.35f;
+            panelImg.color = new Color(1f, 1f, 1f, 0.97f);
+            var panelRt = panel.GetComponent<RectTransform>();
+            panelRt.anchorMin = Vector2.zero;
+            panelRt.anchorMax = Vector2.one;
+            panelRt.offsetMin = Vector2.zero;
+            panelRt.offsetMax = Vector2.zero;
 
-            var nameGo = new GameObject("Name");
-            nameGo.transform.SetParent(bubble.transform, false);
-            nameGo.transform.localPosition = new Vector3(0f, 0.68f, -0.01f);
-            var nameTmp = nameGo.AddComponent<TextMeshPro>();
-            if (GameFont) {
-                nameTmp.font = GameFont;
-            }
-            nameTmp.fontSize = 1.5f;
-            nameTmp.alignment = TextAlignmentOptions.Center;
-            nameTmp.rectTransform.sizeDelta = new Vector2(3.4f, 0.4f);
+            var nameTmp = MakeUguiText(panel.transform, "Name", "", 30f,
+                new Vector2(18f, -16f), new Vector2(420f, 34f), Color.white);
+            nameTmp.alignment = TextAlignmentOptions.TopLeft;
+            var nrt = nameTmp.rectTransform;
+            nrt.anchorMin = new Vector2(0f, 1f);
+            nrt.anchorMax = new Vector2(0f, 1f);
+            nrt.pivot = new Vector2(0f, 1f);
 
-            var lineGo = new GameObject("Line");
-            lineGo.transform.SetParent(bubble.transform, false);
-            lineGo.transform.localPosition = new Vector3(0f, 0.02f, -0.01f);
-            var lineTmp = lineGo.AddComponent<TextMeshPro>();
-            if (GameFont) {
-                lineTmp.font = GameFont;
-            }
-            lineTmp.fontSize = 1.05f;
-            lineTmp.alignment = TextAlignmentOptions.Top;
-            lineTmp.rectTransform.sizeDelta = new Vector2(3.35f, 1.05f);
+            var lineTmp = MakeUguiText(panel.transform, "Line", "", 25f,
+                new Vector2(18f, -54f), new Vector2(470f, 118f), new Color(0.09f, 0.09f, 0.12f));
+            lineTmp.alignment = TextAlignmentOptions.TopLeft;
+            var lrt = lineTmp.rectTransform;
+            lrt.anchorMin = new Vector2(0f, 1f);
+            lrt.anchorMax = new Vector2(0f, 1f);
+            lrt.pivot = new Vector2(0f, 1f);
+
+            var promptGo = new GameObject("Prompt");
+            promptGo.transform.SetParent(panel.transform, false);
+            var prompt = promptGo.AddComponent<Image>();
+            prompt.sprite = SpriteAsset("Assets/Sprites/UI/Menu/Elements/a-prompt.png");
+            prompt.preserveAspect = true;
+            var prt2 = promptGo.GetComponent<RectTransform>();
+            prt2.anchorMin = new Vector2(1f, 0f);
+            prt2.anchorMax = new Vector2(1f, 0f);
+            prt2.pivot = new Vector2(1f, 0f);
+            prt2.anchoredPosition = new Vector2(-16f, 14f);
+            prt2.sizeDelta = new Vector2(42f, 42f);
 
             var voice = holder.AddComponent<AudioSource>();
-            voice.clip = Clip("Assets/Sound/ui/chat_fulltype.wav");
             voice.playOnAwake = false;
             voice.spatialBlend = 0f;
-            voice.volume = 0.6f;
+            voice.volume = 0.75f;
 
             dlg.bubble = bubble;
             dlg.nameText = nameTmp;
             dlg.lineText = lineTmp;
+            dlg.prompt = prompt;
             dlg.voice = voice;
+            dlg.typeClip = Clip("Assets/Sound/ui/chat_keydown.wav");
+            dlg.openClip = Clip("Assets/Sound/ui/windowopen.ogg");
+            dlg.doneClip = Clip("Assets/Sound/ui/chat_fulltype.wav");
             bubble.SetActive(false);
+        }
+
+        private static Sprite SpriteAsset(string path) {
+            return AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().FirstOrDefault();
         }
 
         private static TextMeshProUGUI MakeUguiText(Transform parent, string name, string text, float size, Vector2 pos, Vector2 dims, Color c) {
@@ -640,6 +667,7 @@ namespace NSMB.WorldEditor {
             var portal = root.AddComponent<WorldPortal>();
             portal.sceneName = sceneName;
             portal.url = url;
+            portal.enterClip = Clip("Assets/Sound/ui/start_game.ogg");
             FloatingLabel(root.transform, label, 2.1f);
         }
 

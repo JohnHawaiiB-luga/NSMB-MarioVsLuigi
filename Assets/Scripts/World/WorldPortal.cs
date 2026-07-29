@@ -9,6 +9,7 @@ namespace NSMB.World {
 
         public string sceneName;
         public string url;
+        public AudioClip enterClip;
 
         private bool playerInside;
         private Controls controls;
@@ -41,6 +42,9 @@ namespace NSMB.World {
             // Powerup Action (E / C / RB) — the game's own "do the thing" button.
             if (controls == null || !controls.Player.PowerupAction.WasPressedThisFrame()) {
                 return;
+            }
+            if (enterClip) {
+                AudioSource.PlayClipAtPoint(enterClip, transform.position, 0.8f);
             }
             if (!string.IsNullOrEmpty(sceneName)) {
                 SceneManager.LoadScene(sceneName);

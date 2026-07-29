@@ -12,6 +12,7 @@ namespace NSMB.World {
         public float smoothTime = 0.18f;
         public float lookHeight = 0.65f;
         public float blendSpeed = 2.2f;
+        public AudioClip swapClip;
 
         // 0 = free 3D chase, 1 = the game's own 2.5D side-on view. Past the
         // halfway point the controller also locks movement to the plane, which
@@ -39,6 +40,9 @@ namespace NSMB.World {
             // swaps the view — their binding, their gamepad button, no new keys.
             if (controls != null && controls.Player.ReserveItem.WasPressedThisFrame()) {
                 targetBlend = targetBlend > 0.5f ? 0f : 1f;
+                if (swapClip) {
+                    AudioSource.PlayClipAtPoint(swapClip, transform.position, 0.7f);
+                }
             }
             blend = Mathf.MoveTowards(blend, targetBlend, blendSpeed * Time.deltaTime);
         }
