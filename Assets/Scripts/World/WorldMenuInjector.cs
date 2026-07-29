@@ -7,12 +7,13 @@ using UnityEngine.UI;
 
 namespace NSMB.World {
     // Turns the game's own Play Game button into a fork: World Hub or Versus.
-    // Both choices are buttons cloned from theirs, so the chooser is their UI
-    // in their style; Versus fires the original action untouched. Also swaps
-    // the menu's music for the World theme.
+    // Both choices are clones of BtnPlay, so the chooser is their pipe-button UI
+    // in their style; Versus fires the original action untouched. Also swaps the
+    // menu music for the World theme.
     public class WorldMenuInjector : MonoBehaviour {
 
         private Button.ButtonClickedEvent versusAction;
+        private RectTransform anchor;
         private readonly List<GameObject> siblings = new();
         private readonly List<GameObject> chooser = new();
         private AudioSource music;
@@ -33,6 +34,7 @@ namespace NSMB.World {
             siblings.Clear();
             chooser.Clear();
             versusAction = null;
+            anchor = null;
             if (scene.name == "MainMenu") {
                 StartCoroutine(Watch());
             }
@@ -49,7 +51,6 @@ namespace NSMB.World {
             }
         }
 
-        // The menu's own looping player keeps its clip; ours plays instead.
         private void SwapMusic() {
             if (music && music.isPlaying) {
                 return;
@@ -76,16 +77,16 @@ namespace NSMB.World {
             music.Play();
         }
 
+        // The menu's buttons are PipeButton prefab instances named BtnPlay,
+        // BtnOptions, BtnReplays, BtnAddons, BtnAbout, BtnQuit.
         private void TryInject() {
             Button play = null;
-            foreach (var b in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
-                var label = b.GetComponentInChildren<TMP_Text>(true);
-                if (!label) {
+            foreach (var t in FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)) {
+                if (t.name != "BtnPlay") {
                     continue;
                 }
-                string t = label.text.ToLowerInvariant();
-                if (t.Contains("play") || t.Contains("mainmenu.play")) {
-                    play = b;
+                play = t.GetComponent<Button>();
+                if (play) {
                     break;
                 }
             }
@@ -93,8 +94,7 @@ namespace NSMB.World {
                 return;
             }
 
-            // Everything currently sharing the button column gets hidden while
-            // the chooser is up, and restored when it closes.
+            anchor = play.GetComponent<RectTransform>();
             siblings.Clear();
             foreach (Transform child in play.transform.parent) {
                 siblings.Add(child.gameObject);
@@ -115,12 +115,15 @@ namespace NSMB.World {
                 versusAction?.Invoke();
             }));
             chooser.Add(Clone(play, "Back", new Color(0.35f, 0.35f, 0.4f), Restore));
+            Debug.Log("[World] menu fork installed on BtnPlay");
         }
 
         private GameObject Clone(Button source, string label, Color tint, UnityEngine.Events.UnityAction action) {
             var clone = Instantiate(source.gameObject, source.transform.parent);
             clone.name = "World_" + label.Replace(" ", "");
 
+            // Strip upstream logic (translation drivers would overwrite the
+            // label, submenu handlers would open their menus) and keep visuals.
             foreach (var mb in clone.GetComponentsInChildren<MonoBehaviour>(true)) {
                 bool keep = mb is Button || mb is Image || mb is TMP_Text
                     || mb is LayoutElement || mb is LayoutGroup || mb is ContentSizeFitter
@@ -151,16 +154,21 @@ namespace NSMB.World {
                     go.SetActive(false);
                 }
             }
+            bool laidOut = anchor && anchor.parent && anchor.parent.GetComponent<LayoutGroup>();
+            float step = anchor ? anchor.rect.height + 14f : 90f;
             for (int i = 0; i < chooser.Count; i++) {
                 if (!chooser[i]) {
                     continue;
                 }
                 chooser[i].SetActive(true);
+                if (!laidOut && anchor) {
+                    var rt = chooser[i].GetComponent<RectTransform>();
+                    rt.anchoredPosition = anchor.anchoredPosition + new Vector2(0f, -step * i);
+                }
                 chooser[i].transform.SetSiblingIndex(i);
             }
-            var first = chooser.Count > 0 ? chooser[0] : null;
-            if (first && UnityEngine.EventSystems.EventSystem.current) {
-                UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(first);
+            if (chooser.Count > 0 && chooser[0] && UnityEngine.EventSystems.EventSystem.current) {
+                UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(chooser[0]);
             }
         }
 
