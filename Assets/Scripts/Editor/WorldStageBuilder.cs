@@ -356,7 +356,8 @@ namespace NSMB.WorldEditor {
             BuildLuigi(root.transform, spawn);
             BuildBubble(root.transform);
             BuildSigns(root.transform, spawn);
-            Debug.Log("[WorldStageBuilder] story layer built: Luigi, dialogue and signs");
+            BuildDoors(root.transform, spawn);
+            Debug.Log("[WorldStageBuilder] story layer built: Luigi, dialogue, signs and doors");
         }
 
         private static void BuildLuigi(Transform parent, Vector3 spawn) {
@@ -555,34 +556,111 @@ namespace NSMB.WorldEditor {
                 }),
                 ("LUIGI", 96f, new[] {
                     "MARIO|Who does something like this?!",
-                    "LUIGI|Some engineer named David. Munich, apparently. Builds testing tools for a living.",
-                    "LUIGI|Found our engine, decided it made a nice place to keep his portfolio in.",
+                    "LUIGI|An engineer. David. Munich. He takes things apart to find out what breaks them —",
+                    "LUIGI|professionally, Mario. People pay him to break things and write down why.",
+                    "MARIO|…And he broke US?",
+                    "LUIGI|He opened us. Wanted to know how a game actually holds together underneath.",
                 }),
                 ("LUIGI", 150f, new[] {
-                    "LUIGI|Don't get comfortable, though. We're placeholders.",
-                    "MARIO|Placeholders?! Luigi, I'm the mascot!",
-                    "LUIGI|He's sculpting his own two. David and Erik. We're keeping their seats warm.",
-                    "LUIGI|…And if anyone from Nintendo is reading: he says please don't take this down. Pweaseeee.",
+                    "LUIGI|Here's the part that got me. Look down at yourself.",
+                    "MARIO|What? I look fine. Handsome, even.",
+                    "LUIGI|You're a 3D model, Mario. Always were. Every one of us is.",
+                    "LUIGI|We were just never allowed to walk anywhere but along one flat line.",
+                    "MARIO|…Mamma mia. All these years?",
+                    "LUIGI|He wanted to see what happened if he moved the camera off that line. So — this.",
                 }),
                 ("LUIGI", 210f, new[] {
-                    "MARIO|So where does all this go? There's a whole… glowing rectangle back there.",
-                    "LUIGI|That's the rest of him. erikgaren.com. Looks like a phone, runs like an OS.",
-                    "LUIGI|HawaiiOS, he calls it. Tiles, apps, the serious half. This is the half with pipes.",
+                    "MARIO|So he did all this just to poke at it?",
+                    "LUIGI|To learn it. Engine, physics, the simulation that decides where we land.",
+                    "LUIGI|Then he needed somewhere to keep the results, and a folder felt insulting.",
+                    "LUIGI|That's the rest of him back there — erikgaren.com. Looks like a phone, runs like an OS.",
+                    "LUIGI|HawaiiOS, he calls it. The pipes go there. This half just has better jumping.",
                 }),
                 ("LUIGI", 280f, new[] {
                     "MARIO|Let's-a-go further! I want to see the end of it!",
-                    "LUIGI|Then walk. Press C if you want to float around and look, TAB to see the wiring.",
-                    "LUIGI|Keep right long enough and you'll come out where you started. It loops, somehow.",
+                    "LUIGI|It's a long walk. He left shortcuts in — the bracket keys, [ and ].",
+                    "LUIGI|One press, one whole stage. F lifts the camera off the line. ` shows the wiring.",
+                    "LUIGI|And N… N turns the walls off. You just fly. Don't tell Peach.",
+                    "MARIO|We could have been doing that the WHOLE TIME?",
+                    "LUIGI|Keep right long enough and you'll come out where you started, too. It loops.",
                 }),
             };
 
-            foreach ((string speaker, float x, string[] lines) in script) {
+            // Said on the way back through, so a second pass is not the same
+            // recording. Indexed to match the script above.
+            string[][] again = {
+                new[] {
+                    "LUIGI|Back already? The door's still that way, Mario.",
+                    "MARIO|I know, I know. I just wanted to check it was still there.",
+                },
+                new[] {
+                    "MARIO|The bricks are still bricks. Nothing's fixed itself.",
+                    "LUIGI|It's not broken, Mario. It's just… arranged.",
+                },
+                new[] {
+                    "MARIO|Do you think he found what he was looking for? In here?",
+                    "LUIGI|He got it running, didn't he. That's usually the answer.",
+                },
+                new[] {
+                    "MARIO|I've been walking sideways my whole life, Luigi.",
+                    "LUIGI|Try the F key. Just… don't tell the others what's back there.",
+                },
+                new[] {
+                    "LUIGI|The pipes still go to the site whenever you want out.",
+                    "MARIO|Later. I like it in here.",
+                },
+                new[] {
+                    "LUIGI|You've walked the whole thing now, haven't you.",
+                    "MARIO|Twice! And I'd do it again!",
+                },
+            };
+
+            for (int i = 0; i < script.Length; i++) {
+                (string speaker, float x, string[] lines) = script[i];
                 var go = new GameObject("Sign_" + Mathf.RoundToInt(x));
                 go.transform.SetParent(parent, false);
                 go.transform.position = spawn + new Vector3(x, 0f, 0f);
                 var sign = go.AddComponent<WorldHubSign>();
                 sign.speaker = speaker;
                 sign.lines = lines;
+                sign.revisitLines = i < again.Length ? again[i] : null;
+            }
+        }
+
+        // Doors out of the hub, placed on the pipes the blended stages already
+        // stand up. Each one runs the quit ritual and lands the player in a
+        // particular part of the site, which is what stitches the two halves
+        // together: you leave down a pipe rather than by closing a tab.
+        private static void BuildDoors(Transform parent, Vector3 spawn) {
+            (string label, string url, float x)[] doors = {
+                ("HAWAIIOS", "/os", 34f),
+                ("PORTFOLIO", "/", 128f),
+                ("PROJECTS", "/projects", 186f),
+            };
+
+            foreach ((string label, string url, float x) in doors) {
+                var go = new GameObject("Door_" + label);
+                go.transform.SetParent(parent, false);
+                go.transform.position = spawn + new Vector3(x, 0f, 0f);
+
+                var door = go.AddComponent<WorldDoor>();
+                door.destination = url;
+                door.label = label;
+
+                // A sign so nobody has to guess that the pipe means something.
+                var signGo = new GameObject("DoorSign_" + label);
+                signGo.transform.SetParent(go.transform, false);
+                var sign = signGo.AddComponent<WorldHubSign>();
+                sign.speaker = "LUIGI";
+                sign.radius = 4f;
+                sign.repeatAfter = 40f;
+                sign.lines = new[] {
+                    $"LUIGI|This pipe's a door, Mario. Marked {label}.",
+                    "LUIGI|Press down on it and you'll come out the other side — in his site.",
+                };
+                sign.revisitLines = new[] {
+                    $"LUIGI|Still marked {label}. Down whenever you like.",
+                };
             }
         }
 

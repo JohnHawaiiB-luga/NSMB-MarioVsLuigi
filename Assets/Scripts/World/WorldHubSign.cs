@@ -9,12 +9,17 @@ namespace NSMB.World {
 
         public string speaker = "LUIGI";
         [TextArea(2, 6)] public string[] lines;
+
+        // Said on the way back through. Walking past a sign a second time and
+        // hearing the same introduction makes the world feel like a recording.
+        [TextArea(2, 6)] public string[] revisitLines;
         public float radius = 5f;
         public float verticalRadius = 7f;
         public float repeatAfter = 25f;
 
         private float spokenAt = -999f;
         private bool inside;
+        private int visits;
 
         private void Update() {
             if (lines == null || lines.Length == 0) {
@@ -33,8 +38,10 @@ namespace NSMB.World {
             bool near = dx <= radius && dy <= verticalRadius;
 
             if (near && !inside && Time.time - spokenAt > repeatAfter && !WorldDialogue.IsOpen) {
-                WorldDialogue.Say(speaker, lines);
+                bool returning = visits > 0 && revisitLines != null && revisitLines.Length > 0;
+                WorldDialogue.Say(speaker, returning ? revisitLines : lines);
                 spokenAt = Time.time;
+                visits++;
             }
             inside = near;
         }

@@ -14,14 +14,17 @@ namespace NSMB.World {
 
 #if UNITY_WEBGL && !UNITY_EDITOR
         [System.Runtime.InteropServices.DllImport("__Internal")]
-        private static extern void WorldExitSite();
+        private static extern void WorldExitSite(string url);
 #else
-        private static void WorldExitSite() {
-            Debug.Log("[World] exit to site");
+        private static void WorldExitSite(string url) {
+            Debug.Log("[World] exit to site: " + (string.IsNullOrEmpty(url) ? "/" : url));
         }
 #endif
 
+        public static WorldExitFlow Instance { get; private set; }
+
         private bool leaving;
+        private string destination;
         private AudioSource audioSource;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -32,6 +35,7 @@ namespace NSMB.World {
         }
 
         private void Awake() {
+            Instance = this;
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
             audioSource.spatialBlend = 0f;
@@ -44,7 +48,15 @@ namespace NSMB.World {
 
         // Called by the page (SendMessage) and by the game's own Quit button.
         public void RequestQuit() {
+            RequestQuitTo("");
+        }
+
+        // The same ritual, ending somewhere specific — a pipe marked PROJECTS
+        // leaves the player standing in that part of the site rather than at
+        // the front door.
+        public void RequestQuitTo(string url) {
             if (!leaving) {
+                destination = url;
                 StartCoroutine(Leave());
             }
         }
@@ -78,7 +90,7 @@ namespace NSMB.World {
                 yield return null;
             }
 
-            WorldExitSite();
+            WorldExitSite(destination ?? "");
         }
 
         // Their Quit button means "leave the game" — on the web that means the
