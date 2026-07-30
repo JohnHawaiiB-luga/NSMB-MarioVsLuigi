@@ -51,8 +51,12 @@ namespace NSMB.World {
             // Their own bindings take C (powerup), V (reserve item), Tab
             // (scoreboard), Shift/X (sprint), Z/Space (jump) and Escape (pause).
             // Backquote is the console key by convention and F is free.
-            if (keyboard.backquoteKey.wasPressedThisFrame) {
+            // Backquote sits somewhere else on a German layout, so P opens the
+            // panel too. Logged because "the key did nothing" and "the key was
+            // never seen" look identical from the outside.
+            if (keyboard.backquoteKey.wasPressedThisFrame || keyboard.pKey.wasPressedThisFrame) {
                 shown = !shown;
+                Debug.Log($"[World] debug panel {(shown ? "open" : "closed")}");
             }
             if (keyboard.fKey.wasPressedThisFrame) {
                 ToggleCamera();
@@ -70,21 +74,31 @@ namespace NSMB.World {
             }
         }
 
+        // The hub's runner is started by WorldLocalGame with its own id, so
+        // QuantumRunner.DefaultGame is not necessarily it — and a null-conditional
+        // on that static swallowed every command silently. NetworkHandler.Runner
+        // is the reference the hub actually started.
+        private static QuantumGame Game =>
+            NSMB.Networking.NetworkHandler.Runner != null
+                ? NSMB.Networking.NetworkHandler.Runner.Game
+                : QuantumRunner.DefaultGame;
+
         private static void Send(CommandMvLDebugCmd.DebugCommand id, FPVector2 position) {
-            QuantumRunner.DefaultGame?.SendCommand(new CommandMvLDebugCmd {
+            QuantumGame game = Game;
+            if (game == null) {
+                Debug.LogWarning($"[World] {id}: no running game to send to");
+                return;
+            }
+            game.SendCommand(new CommandMvLDebugCmd {
                 CommandId = id,
                 Position = position,
             });
+            Debug.Log($"[World] sent {id}");
         }
 
         // Through the simulation, as a command: a transform moved from the view
         // side is fought by physics and gone by the next tick.
         private static void Warp(float dx) {
-            var game = QuantumRunner.DefaultGame;
-            if (game == null) {
-                return;
-            }
-
             Transform mario = LocalMario();
             if (!mario) {
                 return;
@@ -92,12 +106,25 @@ namespace NSMB.World {
 
             // A little height so you drop onto whatever is there rather than
             // waking up inside it.
-            game.SendCommand(new CommandMvLDebugCmd {
-                CommandId = CommandMvLDebugCmd.DebugCommand.Warp,
-                Position = new FPVector2(
-                    FP.FromFloat_UNSAFE(mario.position.x + dx),
-                    FP.FromFloat_UNSAFE(mario.position.y + 3f)),
-            });
+            Send(CommandMvLDebugCmd.DebugCommand.Warp, new FPVector2(
+                FP.FromFloat_UNSAFE(mario.position.x + dx),
+                FP.FromFloat_UNSAFE(mario.position.y + 3f)));
+        }
+
+        // Reads the state straight off the simulation rather than keeping a copy
+        // here, so the panel cannot disagree with what is actually true.
+        private static unsafe bool Noclipping() {
+            QuantumGame game = Game;
+            Frame frame = game?.Frames.Predicted;
+            if (frame == null) {
+                return false;
+            }
+            foreach ((var entity, var mario) in frame.Unsafe.GetComponentBlockIterator<MarioPlayer>()) {
+                if (frame.Unsafe.TryGetPointer(entity, out PhysicsObject* physics)) {
+                    return physics->IsFrozen && physics->DisableCollision;
+                }
+            }
+            return false;
         }
 
         private static Transform LocalMario() {
@@ -163,6 +190,7 @@ namespace NSMB.World {
             Line("players", MarioPlayerAnimator.AllMarioPlayers.Count.ToString());
             Line("dialogue", WorldDialogue.IsOpen ? "open" : "idle");
             Line("session", WorldLocalGame.Running ? "world hub" : "versus");
+            Line("noclip", Noclipping() ? "ON — flying" : "off");
 
             if (GUI.Button(new Rect(x + 10, 32 + row * 18 + 6, 150, 22), "camera (F)")) {
                 ToggleCamera();

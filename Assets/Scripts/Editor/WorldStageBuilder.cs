@@ -356,7 +356,7 @@ namespace NSMB.WorldEditor {
             BuildLuigi(root.transform, spawn);
             BuildBubble(root.transform);
             BuildSigns(root.transform, spawn);
-            BuildDoors(root.transform, spawn);
+            BuildDoors(root.transform, spawn, MainTilemap(scene));
             Debug.Log("[WorldStageBuilder] story layer built: Luigi, dialogue, signs and doors");
         }
 
@@ -631,37 +631,112 @@ namespace NSMB.WorldEditor {
         // stand up. Each one runs the quit ritual and lands the player in a
         // particular part of the site, which is what stitches the two halves
         // together: you leave down a pipe rather than by closing a tab.
-        private static void BuildDoors(Transform parent, Vector3 spawn) {
-            (string label, string url, float x)[] doors = {
-                ("HAWAIIOS", "/os", 34f),
-                ("PORTFOLIO", "/", 128f),
-                ("PROJECTS", "/projects", 186f),
+        private static void BuildDoors(Transform parent, Vector3 spawn, Tilemap map) {
+            (string label, string url, float x, string colour)[] doors = {
+                ("HAWAIIOS", "/os", 34f, "green"),
+                ("PORTFOLIO", "/", 128f, "red"),
+                ("PROJECTS", "/projects", 186f, "yellow"),
             };
 
-            foreach ((string label, string url, float x) in doors) {
+            foreach ((string label, string url, float x, string colour) in doors) {
+                float worldX = spawn.x + x;
+                // A door with no pipe under it is a rumour: Luigi announces
+                // something the player cannot see. Stand a real one up out of
+                // their own pipe tiles, one colour per destination.
+                float mouthY = Pipe(map, worldX, colour);
+
                 var go = new GameObject("Door_" + label);
                 go.transform.SetParent(parent, false);
-                go.transform.position = spawn + new Vector3(x, 0f, 0f);
+                go.transform.position = new Vector3(worldX, mouthY, 0f);
 
                 var door = go.AddComponent<WorldDoor>();
                 door.destination = url;
                 door.label = label;
 
-                // A sign so nobody has to guess that the pipe means something.
-                var signGo = new GameObject("DoorSign_" + label);
+                DoorSign(go.transform, label);
+
+                var signGo = new GameObject("DoorTalk_" + label);
                 signGo.transform.SetParent(go.transform, false);
                 var sign = signGo.AddComponent<WorldHubSign>();
                 sign.speaker = "LUIGI";
-                sign.radius = 4f;
+                sign.radius = 5f;
                 sign.repeatAfter = 40f;
                 sign.lines = new[] {
-                    $"LUIGI|This pipe's a door, Mario. Marked {label}.",
-                    "LUIGI|Press down on it and you'll come out the other side — in his site.",
+                    $"LUIGI|This one's a door, Mario. Marked {label}.",
+                    "LUIGI|Stand on it, press down, and you come out inside his site.",
                 };
                 sign.revisitLines = new[] {
                     $"LUIGI|Still marked {label}. Down whenever you like.",
                 };
             }
+        }
+
+        // Paints a two-tile-wide pipe standing on whatever ground is at this
+        // column and returns the world height of its mouth.
+        private static float Pipe(Tilemap map, float worldX, string colour) {
+            if (!map) {
+                return 0f;
+            }
+
+            int left = Mathf.RoundToInt(worldX * 2f);
+            BoundsInt bounds = map.cellBounds;
+
+            // Find the ground under the column so the pipe sits on it rather
+            // than hovering or sinking.
+            int ground = bounds.yMin;
+            for (int y = bounds.yMin; y < bounds.yMax; y++) {
+                if (map.GetTile(new Vector3Int(left, y, 0)) || map.GetTile(new Vector3Int(left + 1, y, 0))) {
+                    ground = y;
+                }
+            }
+
+            TileBase leftTop = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_left_top.asset");
+            TileBase rightTop = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_right_top.asset");
+            TileBase leftStem = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_left.asset");
+            TileBase rightStem = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_right.asset");
+            if (!leftTop || !rightTop) {
+                Debug.LogWarning($"[WorldStageBuilder] no {colour} pipe tiles — door has no pipe");
+                return (ground + 1) * 0.5f;
+            }
+
+            const int height = 3;
+            for (int i = 0; i < height; i++) {
+                int y = ground + 1 + i;
+                bool top = i == height - 1;
+                map.SetTile(new Vector3Int(left, y, 0), top ? leftTop : leftStem ? leftStem : leftTop);
+                map.SetTile(new Vector3Int(left + 1, y, 0), top ? rightTop : rightStem ? rightStem : rightTop);
+            }
+
+            // Standing on the mouth, in world units — tiles are half a unit.
+            return (ground + 1 + height) * 0.5f;
+        }
+
+        // A board over the pipe saying where it goes, in the game's own panel art.
+        private static void DoorSign(Transform parent, string label) {
+            var canvasGo = new GameObject("Sign", typeof(Canvas));
+            canvasGo.transform.SetParent(parent, false);
+            canvasGo.transform.localPosition = new Vector3(0.5f, 2.2f, 0f);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var rect = canvas.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(4f, 1f);
+            rect.localScale = Vector3.one * 0.5f;
+
+            var panel = new GameObject("Panel", typeof(Image));
+            panel.transform.SetParent(canvasGo.transform, false);
+            var image = panel.GetComponent<Image>();
+            image.sprite = Sprite("Assets/Sprites/UI/Menu/Elements/rounded-rect-5px.png");
+            image.type = Image.Type.Sliced;
+            image.color = new Color(0.05f, 0.06f, 0.1f, 0.9f);
+            var panelRect = panel.GetComponent<RectTransform>();
+            panelRect.anchorMin = Vector2.zero;
+            panelRect.anchorMax = Vector2.one;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+
+            TMP_Text text = Text(panel.transform, "Label", 0.5f, TextAlignmentOptions.Center,
+                Vector2.zero, Vector2.one);
+            text.text = label + "\n<size=70%>↓ press down</size>";
         }
 
         private static Tilemap MainTilemap(Scene scene) {
