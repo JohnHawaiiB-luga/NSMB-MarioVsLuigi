@@ -38,7 +38,7 @@ MonoBehaviour:
       RawValue: 524288
     Y:
       RawValue: 327680
-  IsWrappingLevel: 0
+  IsWrappingLevel: 1
   ExtendCeilingHitboxes: 0
   Spawnpoint:
     X:
@@ -53,12 +53,12 @@ MonoBehaviour:
   OverrideAutomaticCameraSettings: 0
   CameraMinPosition:
     X:
-      RawValue: -1048576
+      RawValue: -65536000
     Y:
       RawValue: 0
   CameraMaxPosition:
     X:
-      RawValue: 36503552
+      RawValue: 65536000
     Y:
       RawValue: 2916352
   UIColor:

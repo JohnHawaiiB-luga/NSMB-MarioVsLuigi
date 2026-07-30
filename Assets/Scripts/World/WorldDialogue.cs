@@ -15,6 +15,8 @@ namespace NSMB.World {
         public TMP_Text nameText;
         public TMP_Text lineText;
         public Image prompt;
+        public Image portrait;
+        public Sprite marioFace, luigiFace;
         public AudioSource voice;
         public AudioClip typeClip, openClip, doneClip;
         public float charsPerSecond = 42f;
@@ -70,9 +72,18 @@ namespace NSMB.World {
             (string speaker, string line) = queue.Dequeue();
             bubble.SetActive(true);
             nameText.text = speaker;
-            nameText.color = speaker.Contains("DAVID") ? new Color(1f, 0.5f, 0.38f)
-                : speaker.Contains("ERIK") ? new Color(0.5f, 0.95f, 0.55f)
+            nameText.color = speaker.Contains("MARIO") ? new Color(1f, 0.5f, 0.38f)
+                : speaker.Contains("LUIGI") ? new Color(0.5f, 0.95f, 0.55f)
                 : Color.white;
+
+            // Their own character art, so you can see who is talking at a glance.
+            if (portrait) {
+                Sprite face = speaker.Contains("LUIGI") ? luigiFace
+                    : speaker.Contains("MARIO") ? marioFace
+                    : null;
+                portrait.sprite = face;
+                portrait.enabled = face;
+            }
             full = line;
             revealed = 0;
             lineText.text = "";
@@ -85,8 +96,21 @@ namespace NSMB.World {
         }
 
         private WorldSpeaker Find(string speaker) {
+            WorldSpeaker match = Match(speaker);
+            if (match) {
+                return match;
+            }
+            // Mario's speaker is attached once the companion finds him, which is
+            // after this list was taken — so a miss means look again, not that
+            // nobody is there.
+            speakers = FindObjectsByType<WorldSpeaker>(FindObjectsSortMode.None);
+            return Match(speaker);
+        }
+
+        private WorldSpeaker Match(string speaker) {
             foreach (var s in speakers) {
-                if (!string.IsNullOrEmpty(s.keyword) && speaker.ToUpperInvariant().Contains(s.keyword.ToUpperInvariant())) {
+                if (s && !string.IsNullOrEmpty(s.keyword)
+                    && speaker.ToUpperInvariant().Contains(s.keyword.ToUpperInvariant())) {
                     return s;
                 }
             }

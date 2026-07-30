@@ -17,16 +17,41 @@ namespace NSMB.World {
         public float delay = 0.45f;
         public float maxLag = 9f;
 
+        private static readonly int ParamGlowColor = Shader.PropertyToID("GlowColor");
+
         private readonly Queue<(float time, Vector3 position)> trail = new();
         private Transform target;
         private Vector3 lastPosition;
         private float facing = 1f;
+        private bool marked;
+
+        private void Start() {
+            // Their animator paints every player who is not the camera's focus
+            // with their own colour, so you can pick rivals out in Versus. Off
+            // the simulation there is nobody to paint him clear again, so he
+            // arrived wearing a red halo.
+            var block = new MaterialPropertyBlock();
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true)) {
+                renderer.GetPropertyBlock(block);
+                block.SetColor(ParamGlowColor, Color.clear);
+                renderer.SetPropertyBlock(block);
+            }
+        }
 
         private void Update() {
             if (!target) {
                 target = FindMario();
                 if (!target) {
                     return;
+                }
+                // The bubble anchors to whichever speaker matches the line's
+                // name. Luigi carries one; without one on Mario his lines hung
+                // wherever the bubble happened to be last.
+                if (!marked && !target.GetComponent<WorldSpeaker>()) {
+                    var speaker = target.gameObject.AddComponent<WorldSpeaker>();
+                    speaker.keyword = "MARIO";
+                    speaker.bubbleHeight = 1.6f;
+                    marked = true;
                 }
                 transform.position = target.position;
                 lastPosition = transform.position;

@@ -385,6 +385,22 @@ namespace NSMB.WorldEditor {
                 }
             }
 
+            // MarioPlayerAnimator owns which of the powerup models is showing —
+            // small, blue shell, propeller, hammer suit — and switches them as
+            // the player changes state. With it stripped off, whatever the
+            // prefab happened to ship active stays active, which is why he
+            // turned up permanently wearing a blue shell.
+            foreach (string extra in new[] {
+                "blue_shell", "small_model", "Propeller", "PropellerHat",
+                "HammerShell", "HammerHelmet", "HammerTuckShell", "dust",
+            }) {
+                foreach (var t in luigi.GetComponentsInChildren<Transform>(true)) {
+                    if (t && t.name == extra) {
+                        t.gameObject.SetActive(false);
+                    }
+                }
+            }
+
             // Their gameplay prefabs ship without a controller because the
             // simulation assigns one; standing on his own he needs it spelled
             // out, and needs to animate whether or not he is on screen.
@@ -427,10 +443,21 @@ namespace NSMB.WorldEditor {
             panelRect.offsetMin = Vector2.zero;
             panelRect.offsetMax = Vector2.zero;
 
+            // Their own character art on the left, the way a portrait box works.
+            var portraitGo = new GameObject("Portrait", typeof(Image));
+            portraitGo.transform.SetParent(panel.transform, false);
+            var portrait = portraitGo.GetComponent<Image>();
+            portrait.preserveAspect = true;
+            var portraitRect = portraitGo.GetComponent<RectTransform>();
+            portraitRect.anchorMin = new Vector2(0.02f, 0.16f);
+            portraitRect.anchorMax = new Vector2(0.20f, 0.92f);
+            portraitRect.offsetMin = Vector2.zero;
+            portraitRect.offsetMax = Vector2.zero;
+
             TMP_Text name = Text(panel.transform, "Name", 0.42f, TextAlignmentOptions.TopLeft,
-                new Vector2(0.04f, 0.62f), new Vector2(0.96f, 0.96f));
+                new Vector2(0.22f, 0.62f), new Vector2(0.96f, 0.96f));
             TMP_Text line = Text(panel.transform, "Line", 0.34f, TextAlignmentOptions.TopLeft,
-                new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.62f));
+                new Vector2(0.22f, 0.08f), new Vector2(0.96f, 0.62f));
 
             var promptGo = new GameObject("Prompt", typeof(Image));
             promptGo.transform.SetParent(panel.transform, false);
@@ -453,6 +480,9 @@ namespace NSMB.WorldEditor {
             dialogue.lineText = line;
             dialogue.prompt = prompt;
             dialogue.voice = voice;
+            dialogue.portrait = portrait;
+            dialogue.marioFace = Face("MarioCharacter");
+            dialogue.luigiFace = Face("LuigiCharacter");
             dialogue.typeClip = Clip("Assets/Sound/ui/chat_keydown.wav", "chat_keydown");
             dialogue.openClip = Clip("Assets/Sound/ui/chat_fulltype.wav", "chat_fulltype");
             dialogue.doneClip = dialogue.openClip;
@@ -472,6 +502,18 @@ namespace NSMB.WorldEditor {
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             return tmp;
+        }
+
+        // Their character assets carry the art the menus use; the selection
+        // sprite is the head shot.
+        private static Sprite Face(string character) {
+            var asset = AssetDatabase.LoadAssetAtPath<CharacterAsset>(
+                $"Assets/QuantumUser/Resources/AssetObjects/Characters/{character}.asset");
+            if (!asset) {
+                Debug.LogWarning($"[WorldStageBuilder] {character} not found — no portrait");
+                return null;
+            }
+            return asset.SelectionSprite ? asset.SelectionSprite : asset.ReadySprite;
         }
 
         private static Sprite Sprite(string path) {
@@ -502,31 +544,35 @@ namespace NSMB.WorldEditor {
         private static void BuildSigns(Transform parent, Vector3 spawn) {
             (string speaker, float x, string[] lines)[] script = {
                 ("LUIGI", 8f, new[] {
-                    "LUIGI|Oh — you found the door. Welcome to John Hawaii B. Luga's World.",
-                    "LUIGI|I'm the tour. Mario's the legs. Walk right and I'll do the talking.",
+                    "MARIO|Mamma mia… Luigi? Where are we?",
+                    "LUIGI|I was hoping you'd know, Mario. I woke up here.",
+                    "LUIGI|Look at it. Somebody took our whole world and stitched it back together wrong.",
                 }),
                 ("LUIGI", 52f, new[] {
-                    "LUIGI|The man behind all this is David Erik García Arenas. Munich.",
-                    "LUIGI|He builds 3D QA tooling — the kind that catches what eyes miss.",
-                    "DAVID|Cars, render pipelines, and a lot of things that must not ship broken.",
+                    "MARIO|The grass ends and then… bricks? Just like that?",
+                    "LUIGI|Every stage we've ever raced through, all in a row. Grass, castle, snow, the beach…",
+                    "LUIGI|One long strip. You can walk from one end of the game to the other.",
                 }),
                 ("LUIGI", 96f, new[] {
-                    "LUIGI|Everything you're standing on is this fangame's own engine.",
-                    "LUIGI|Not a copy of it. The real thing, rearranged into a place to walk.",
-                    "LUIGI|Every stage in the game is stitched end to end. Keep going and you'll see them all.",
+                    "MARIO|Who does something like this?!",
+                    "LUIGI|Some engineer named David. Munich, apparently. Builds testing tools for a living.",
+                    "LUIGI|Found our engine, decided it made a nice place to keep his portfolio in.",
                 }),
                 ("LUIGI", 150f, new[] {
-                    "LUIGI|Mario and I are stand-ins, by the way. Placeholders.",
-                    "LUIGI|One day we get replaced by David and Erik — his own two.",
-                    "LUIGI|Nintendo, if you're reading: don't sue, don't take this down. Pweaseeee.",
+                    "LUIGI|Don't get comfortable, though. We're placeholders.",
+                    "MARIO|Placeholders?! Luigi, I'm the mascot!",
+                    "LUIGI|He's sculpting his own two. David and Erik. We're keeping their seats warm.",
+                    "LUIGI|…And if anyone from Nintendo is reading: he says please don't take this down. Pweaseeee.",
                 }),
                 ("LUIGI", 210f, new[] {
-                    "LUIGI|The rest of him lives at erikgaren.com — the phone-looking thing.",
-                    "LUIGI|HawaiiOS. Tiles, apps, the actual portfolio. This is just the fun half.",
+                    "MARIO|So where does all this go? There's a whole… glowing rectangle back there.",
+                    "LUIGI|That's the rest of him. erikgaren.com. Looks like a phone, runs like an OS.",
+                    "LUIGI|HawaiiOS, he calls it. Tiles, apps, the serious half. This is the half with pipes.",
                 }),
                 ("LUIGI", 280f, new[] {
-                    "LUIGI|Still walking? Good. There's a lot of game left in this strip.",
-                    "LUIGI|Press C to look around freely, TAB for the debug panel. Go poke at it.",
+                    "MARIO|Let's-a-go further! I want to see the end of it!",
+                    "LUIGI|Then walk. Press C if you want to float around and look, TAB to see the wiring.",
+                    "LUIGI|Keep right long enough and you'll come out where you started. It loops, somehow.",
                 }),
             };
 
@@ -577,11 +623,14 @@ namespace NSMB.WorldEditor {
 
             // The level we inherited from pins its own camera bounds, which
             // frame one stage. The strip is a dozen of them, so let the bake
-            // measure it, and give the hub two ends rather than wrapping the
-            // far edge back onto the first stage.
+            // measure it.
             stage.OverrideAutomaticCameraSettings = false;
             stage.OverrideAutomaticTilemapSettings = false;
-            stage.IsWrappingLevel = false;
+
+            // Wrapping, but over 573 units instead of a Versus arena: walk right
+            // long enough and the far end comes back around to the start, so the
+            // hub reads as one lap rather than a corridor with two dead ends.
+            stage.IsWrappingLevel = true;
 
             // The hub plays the game's own main menu theme rather than the
             // level's overworld track. world.ogg is the site menu's, not this.
