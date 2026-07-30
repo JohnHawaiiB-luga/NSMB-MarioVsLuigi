@@ -671,6 +671,11 @@ namespace NSMB.WorldEditor {
             }
         }
 
+        private static TileBase PipeTile(string colour, string part) {
+            return AssetDatabase.LoadAssetAtPath<TileBase>(
+                $"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_{part}.asset");
+        }
+
         // Paints a two-tile-wide pipe standing on whatever ground is at this
         // column and returns the world height of its mouth.
         private static float Pipe(Tilemap map, float worldX, string colour) {
@@ -690,10 +695,10 @@ namespace NSMB.WorldEditor {
                 }
             }
 
-            TileBase leftTop = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_left_top.asset");
-            TileBase rightTop = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_right_top.asset");
-            TileBase leftStem = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_left.asset");
-            TileBase rightStem = Load<TileBase>($"Assets/Resources/Tilemaps/Tiles/Pipes/Unbreakable/pipe_{colour}_vertical_right.asset");
+            TileBase leftTop = PipeTile(colour, "left_top");
+            TileBase rightTop = PipeTile(colour, "right_top");
+            TileBase leftStem = PipeTile(colour, "left");
+            TileBase rightStem = PipeTile(colour, "right");
             if (!leftTop || !rightTop) {
                 Debug.LogWarning($"[WorldStageBuilder] no {colour} pipe tiles — door has no pipe");
                 return (ground + 1) * 0.5f;
