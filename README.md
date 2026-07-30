@@ -1,3 +1,49 @@
+# John Hawaii B. Luga's World
+
+This fork powers **John Hawaii B. Luga's World**, the playable half of
+[erikgaren.com](https://erikgaren.com). It is based on NSMB-MarioVsLuigi, used with
+permission, and adds a custom hub world, world navigation, WebGL integration and
+original systems built on top of it. Upstream authorship and credits are preserved
+in full below.
+
+Play it: **[erikgaren.com/play](https://erikgaren.com/play)**
+
+## What this fork adds
+
+- **A hub stage composed from every shipped level.** An editor tool stitches all twelve
+  stages into one continuous 1146×92-tile strip — bottoms aligned, seams bridged with
+  matching ground, and each stage's enemies, coins, blocks and powerups carried across
+  — then authors it as a real Versus stage through the project's own bake pipeline.
+- **A single-player local session.** The game is multiplayer-only. The hub starts a local
+  Photon Quantum session and issues the lobby commands a host would normally send, so the
+  world runs with no server and nobody else present.
+- **A story layer.** A companion that trails the player along their own path, dialogue
+  triggered by proximity, shown in the game's own 9-sliced panel with character
+  portraits, typing sounds and its button prompt.
+- **In-game validation — the Lab.** Reads Quantum's asset database at runtime and audits
+  every stage the build carries against the invariants the simulation reads without
+  guarding: an empty music list or star-spawn table is a modulo by zero the instant play
+  begins. Every check on that list is there because it caused a production crash.
+- **Web delivery.** Brotli-precompressed WebGL served with `Content-Encoding: br`,
+  build-stamped URLs so the browser cannot serve a stale world, on-screen touch controls,
+  and a quit sequence that hands the player back to the website.
+- **Two upstream bug fixes**, offered back to the project: the big-star and
+  objective-coin spawners read their used-slot count *before* clearing it, so once every
+  spawn point was taken they asked the RNG for an empty range; and `PipeButton` had no
+  cursor sound, leaving the whole menu silent under the keyboard.
+
+Mario and Luigi stand in as placeholders while original characters are made. This is a
+fan project and is not affiliated with Nintendo.
+
+Default branch: `world`.
+
+---
+
+# Upstream project
+
+Everything below is the original project's README, by ipodtouch0218 and contributors.
+It is kept intact — the game underneath this fork is their work.
+
 <p align="center">
   <a href="https://ipodtouch0218.itch.io/nsmb-mariovsluigi">
     <img src="https://raw.githubusercontent.com/ipodtouch0218/NSMB-MarioVsLuigi/refs/heads/nightly/Assets/Sprites/UI/Menu/.title-vector.svg?raw=true" alt="Mario vs Luigi Online Logo" width="650px">
